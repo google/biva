@@ -1,0 +1,215 @@
+---
+title: "Bayesian Instrumental Variable analysis for Binary Outcomes"
+author: "Yichi Zhang"
+output: rmarkdown::html_vignette
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = TRUE
+)
+```
+
+Below we demonstrate the overall workflow of the BIVA approach for binary outcomes. 
+
+```{r start, results='hide', message=FALSE, warning=FALSE}
+library(BIVA)
+```
+
+## Demonstration: two-side noncompliance
+
+### Data simulation
+
+We simulate some data from a hypothetical randomized experiment 
+with noncompliance. Those assigned to the treatment group can
+decide to use the feature or not. Those assigned to the control group 
+may also use the feature since it is available to all. In this case,
+we have two-side noncompliance where the assigned treated units can opt out
+and the assigned control can opt in. The outcome metric is a binary variable.
+
+Therefore, there are 3 principal strata: compliers, never-takers, and
+always-takers.
+
+```{r simulated_data_two_side}
+set.seed(1997)
+n <- 200
+
+# Covariates: X observed, U unobserved
+X <- rnorm(n)
+U <- rbinom(n, 1, 0.5)
+
+## True memberships of principal strata (1:c,2:nt,3:at): S-model depends only on U
+true.PS <- rep(0, n)
+U1.ind <- (U == 1)
+U0.ind <- (U == 0)
+num.U1 <- sum(U1.ind)
+num.U0 <- sum(U0.ind)
+true.PS[U1.ind] <- t(rmultinom(num.U1, 1, c(0.6, 0.3, 0.1))) %*% c(1, 2, 3)
+true.PS[U0.ind] <- t(rmultinom(num.U0, 1, c(0.4, 0.5, 0.1))) %*% c(1, 2, 3)
+
+## Treatment assigned: half control & half treatment
+Z <- c(rep(0, n / 2), rep(1, n / 2))
+
+## Treatment received: determined by principal strata and treatment assigned
+D <- rep(0, n)
+c.trt.ind <- (true.PS == 1) & (Z == 1)
+c.ctrl.ind <- (true.PS == 1) & (Z == 0)
+nt.ind <- (true.PS == 2)
+at.ind <- (true.PS == 3)
+num.c.trt <- sum(c.trt.ind)
+num.c.ctrl <- sum(c.ctrl.ind)
+num.nt <- sum(nt.ind)
+num.at <- sum(at.ind)
+D[at.ind] <- rep(1, num.at)
+D[c.trt.ind] <- rep(1, num.c.trt)
+
+## Generate observed outcome: Y-model depend on X, U, D, and principal strata
+Y <- rep(0, n)
+Y[c.ctrl.ind] <- rbinom(num.c.ctrl, 1, 0.3 + 0.02 * X[c.ctrl.ind] - 0.2 * U[c.ctrl.ind])
+Y[c.trt.ind] <- rbinom(num.c.trt, 1, 0.5 + 0.02 * X[c.trt.ind] - 0.2 * U[c.trt.ind])
+Y[nt.ind] <- rbinom(num.c.trt, 1, 0.7 + 0.02 * X[nt.ind] - 0.2 * U[nt.ind])
+Y[at.ind] <- rbinom(num.c.trt, 1, 0.4 + 0.02 * X[at.ind] - 0.2 * U[at.ind])
+
+df <- data.frame(Y = Y, Z = Z, D = D, X = X, U = U)
+```
+
+For the strata model, when U = 1, a unit is a complier, a never-taker, 
+or an always-taker with probability 0.6, 0.3, and 0.1, respectively.
+When U = 0, a unit is a complier, a never-taker, or an always-taker with
+probability 0.4, 0.5, and 0.1, respectively.
+
+The outcome models are by different strata-nudge combinations.
+The compliers may adopt the treatment or not depending on the assigned nudge, 
+and thus have two outcome models by treatment groups. The never-takers will 
+never adopt the treatment feature. The always-takers will always adopt the
+treatment feature. We assume away the direct effect of 
+the nudge here so there is only one outcome model for never-takers, and
+also one model for always-takers.
+
+The four outcome models depend on both the observed X and the unobserved U
+with the same slopes. The contrast between the intercepts of 
+the outcome models for compliers then becomes the CACE of the feature, 
+which is 0.5 - 0.3 = 20%.
+
+### OLS analysis
+
+We again fit an OLS model with the adopted treatment D and 
+the observed covariate X to see the caveats.
+
+```{r OLS_two_side}
+OLS <- lm(data = df, formula = Y ~ D + X)
+summary(OLS)
+confint(OLS, "D")
+```
+
+It returns an uninformative insignificant negative estimate of the treatment
+effect.
+
+We restart the BIVA workflow to get more insight into the impact.
+
+### Prior predictive checking
+
+The outcome type is specified by having y_type = "binary".
+We assume exclusion restriction, so ER = 1. 
+With two-side noncompliance, we set side = 2.
+The parameters in the prior distributions are specified as well.
+We first look into what the prior distributions assume about the parameters.
+
+```{r priors_check_two_side, fig.align = 'center'}
+ivobj <- biva$new(
+  data = df, y = "Y", d = "D", z = "Z",
+  x_ymodel = c("X"),
+  x_smodel = c("X"),
+  y_type = "binary",
+  ER = 1,
+  side = 2,
+  beta_mean_ymodel = matrix(0, 4, 2),
+  beta_sd_ymodel = matrix(1, 4, 2),
+  beta_mean_smodel = matrix(0, 2, 2),
+  beta_sd_smodel = matrix(1, 2, 2),
+  fit = FALSE
+)
+
+ivobj$plotPrior()
+```
+
+By prior, the effect of the AI-powered dubbing feature among compliers 
+is negligible.
+The proportions of compliers, never-takers, and always-takers are similar.
+
+### Fitting a BIVA model to the data
+
+Now we fit a BIVA model to the data.
+
+```{r fit_two_side, fig.align = 'center'}
+ivobj <- biva$new(
+  data = df, y = "Y", d = "D", z = "Z",
+  x_ymodel = c("X"),
+  x_smodel = c("X"),
+  y_type = "binary",
+  ER = 1,
+  side = 2,
+  beta_mean_ymodel = matrix(0, 4, 2),
+  beta_sd_ymodel = matrix(1, 4, 2),
+  beta_mean_smodel = matrix(0, 2, 2),
+  beta_sd_smodel = matrix(1, 2, 2),
+  fit = TRUE
+)
+```
+
+We look at the trace plot of outcomes in each strata.
+The four plots are the posterior draws of the mean outcomes among 
+the compliers assinged to control, the compliers nudged to treatment,
+the never-takers, and the always-takers.
+
+```{r tracePlot_two_side, fig.align = 'center'}
+ivobj$tracePlot()
+```
+
+The convergence and mixing look good.
+
+We run the weak instrument test.
+
+```{r weak_IV_test_two_side, fig.align = 'center'}
+ivobj$weakIVTest()
+```
+
+No weak instrument issue is detected.
+
+We can use the following methods to summarize our findings:
+
+```{r findings_two_side, fig.align = 'center'}
+# Posterior distribution of the strata probability
+ivobj$strataProbEstimate()
+# Posterior probability that CACE is greater than 0.1
+ivobj$calcProb(a = 0.1)
+# Posterior median of the CACE
+ivobj$pointEstimate()
+# Posterior mean of the CACE
+ivobj$pointEstimate(median = FALSE)
+# 75% credible interval of the CACE
+ivobj$credibleInterval()
+# 95% credible interval of the CACE
+ivobj$credibleInterval(width = 0.95)
+```
+The posterior returns informative conclusions on the impact of the treatment.
+
+Visualizations of how the data updates our knowledge about the impact
+by comparing its posterior distribution with the prior can be done by
+running the following methods. We hide them here.
+
+```{r comparison_two_side, eval = FALSE}
+ivobj$vizdraws(
+  display_mode_name = TRUE, breaks = 0.1,
+  break_names = c("< 0.1", "> 0.1")
+)
+ivobj$lollipop(threshold = 0.1, mediumText = 8)
+```
+
+---
+
+#### BIVA
+
+Licensed under the Apache License, Version 2.0.\
