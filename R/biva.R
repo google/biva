@@ -88,7 +88,7 @@ biva <- R6::R6Class(
                           seed = 1997,
                           fit = TRUE,
                           ...) {
-      private$..version <- packageVersion("BIVA")
+      private$..version <- packageVersion("biva")
       private$..y_type <- y_type
       private$..ER <- ER
       private$..side <- side

@@ -1,4 +1,4 @@
-Package: BIVA
+Package: biva
 Title: Bayesian Instrumental Variable Analysis
 Version: 0.0.1
 Authors@R:
