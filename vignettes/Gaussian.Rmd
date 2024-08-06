@@ -26,18 +26,18 @@ the impact of numerous unenforceable treatments, but introduces
 a noncompliance problem: whether units adopt the treatment 
 assigned to them is not guaranteed and subject to unobserved confounding bias.
 
-Suppose the assignment is $$Z$$ ($$Z = 1$$ if nudged, $$0$$ otherwise), 
-the potential treatment adoption is $$D(Z=z) = D(z)$$ ($$D = 1$$ if adopted, 
-$$0$$ otherwise), and the potential outcome is $$Y(Z=z) = Y(z)$$.
+Suppose the assignment is $Z$ ($Z = 1$ if nudged, $0$ otherwise), 
+the potential treatment adoption is $D(Z=z) = D(z)$ ($D = 1$ if adopted, 
+$0$ otherwise), and the potential outcome is $Y(Z=z) = Y(z)$.
 There are four principal strata in this setting:
 
-- Compliers: $$D(1) = 1$$, $$D(0) = 0$$, units who 
+- Compliers: $D(1) = 1$, $D(0) = 0$, units who 
 adopt the treatment when nudged, and do not adopt otherwise.
-- Never-takers: $$D(1) = D(0) = 0$$, units who never 
+- Never-takers: $D(1) = D(0) = 0$, units who never 
 adopt the treatment regardless of nudges.
-- Always-takers: $$D(1) = D(0) = 1$$, units who always 
+- Always-takers: $D(1) = D(0) = 1$, units who always 
 adopt the treatment regardless of nudges.
-- Defiers: $$D(1) = 0$$, $$D(0) = 1$$, units who 
+- Defiers: $D(1) = 0$, $D(0) = 1$, units who 
 do the opposite of what they are nudged to do.
 
 Compliers and defiers are the subgroups for which the impact of 
@@ -81,7 +81,7 @@ $$
 - The as-treated analysis contrasts the average outcomes by treatment adopted,
 ignoring the treatment assignment. It also compares two different mixtures
 of subpopulations. An OLS extension further includes 
-other observed covariates $$X$$. 
+other observed covariates $X$. 
 It is still biased because the treatment adopted is not random 
 and confounded by unobserved confounders.
 
@@ -168,13 +168,13 @@ $$
 \prod_{i: Z_i = 1, D_i = 0} \pi_{i,n} f_{i,n1},
 $$
 
-where $$c$$ stands for compliers, 
-$$a$$ for always-takers, 
-$$n$$ for never-takers, 
-$$\pi_{i,g}$$ is the probability of unit $$i$$ being in strata $$g$$,
-and $$f_{i,gz}$$ is the outcome model for unit $$i$$ in strata $$g$$ assigned
-to treatment status $$z$$. Exclusion restriction is equivalent to
-assuming $$f_{i,a0} = f_{i,a1}$$ and $$f_{i,n0} = f_{i,n1}$$. The CACE
+where $c$ stands for compliers, 
+$a$ for always-takers, 
+$n$ for never-takers, 
+$\pi_{i,g}$ is the probability of unit $i$ being in strata $g$,
+and $f_{i,gz}$ is the outcome model for unit $i$ in strata $g$ assigned
+to treatment status $z$. Exclusion restriction is equivalent to
+assuming $f_{i,a0} = f_{i,a1}$ and $f_{i,n0} = f_{i,n1}$. The CACE
 of the treatment is recovered by the following quantity:
 
 $$
