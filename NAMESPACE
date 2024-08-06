@@ -2,3 +2,9 @@
 
 export(CleanData)
 export(biva)
+import(Rcpp)
+import(methods)
+importFrom(RcppParallel,RcppParallelLibs)
+importFrom(rstan,sampling)
+importFrom(rstantools,rstan_config)
+useDynLib(biva, .registration = TRUE)

@@ -1,3 +1,4 @@
+/*
 # Copyright 2024 Google LLC
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+*/
 
 data {
     // The number of observations
@@ -98,7 +100,7 @@ transformed data {
         M00[1] = 1;
         M00[2] = 3;
 
-        length01 = 1; 
+        length01 = 1;
         M01[1] = 4;
         M01[2] = 0;
 
@@ -226,7 +228,7 @@ model {
       }
     }
 }
- 
+
 generated quantities {
     // the probability of being in each stratum
     vector[K_smodel+1] strata_prob;
@@ -237,7 +239,7 @@ generated quantities {
         matrix[N, K_smodel+1] log_prob;
         // each individual's expected means for Y-models
         matrix[N, K_ymodel] expected_mean;
-        // weighted sum of individual's expected means for Y-models by probability of being in the relevant stratum 	    
+        // weighted sum of individual's expected means for Y-models by probability of being in the relevant stratum
         vector[K_ymodel] weighted_outcome_sum;
 
         log_prob[:, 1] = rep_vector(0, N);

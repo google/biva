@@ -11,7 +11,7 @@ Description: An implementation of Bayesian IV analysis for impact measurement
 License: Apache License (== 2.0)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 Biarch: true
 Imports: 
     R6,
