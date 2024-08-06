@@ -1,3 +1,4 @@
+/*
 # Copyright 2024 Google LLC
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+*/
 
 data {
     // The number of observations
@@ -75,7 +77,7 @@ transformed data {
 
     if (ER == 1 && K_smodel == 1) {
         // E.g., when we assume ER and there is only one-sided noncompliance
-        // There are two eligible Y-models for those assigned control and observed control 
+        // There are two eligible Y-models for those assigned control and observed control
         length00 = 2;
         // Eligible Y-models: the 1st Y-model for compliers assigned to control;
         //                    the 3rd Y-model for never-takers assigned to control
@@ -102,7 +104,7 @@ transformed data {
         M00[1] = 1;
         M00[2] = 3;
 
-        length01 = 1; 
+        length01 = 1;
         M01[1] = 4;
         M01[2] = 0;
 

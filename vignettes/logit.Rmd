@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 Below we demonstrate the overall workflow of the BIVA approach for binary outcomes. 
 
 ```{r start, results='hide', message=FALSE, warning=FALSE}
-library(BIVA)
+library(biva)
 ```
 
 ## Demonstration: two-side noncompliance

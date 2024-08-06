@@ -199,7 +199,7 @@ when the size of the data is small.
 Below we demonstrate the overall workflow of the BIVA approach.
 
 ```{r start, results='hide', message=FALSE, warning=FALSE}
-library(BIVA)
+library(biva)
 ```
 
 ## Demonstration 1: one-side noncompliance

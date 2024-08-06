@@ -88,7 +88,7 @@ biva <- R6::R6Class(
                           seed = 1997,
                           fit = TRUE,
                           ...) {
-      private$..version <- packageVersion("BIVA")
+      private$..version <- packageVersion("biva")
       private$..y_type <- y_type
       private$..ER <- ER
       private$..side <- side
@@ -181,11 +181,11 @@ biva <- R6::R6Class(
       private$..stan_data <- stan_data
       # Draw from the prior
       if (y_type == "real") {
-        sim_out <- rstan::sampling(BIVA.models::Gaussian,
+        sim_out <- rstan::sampling(stanmodels$Gaussian,
           data = private$..stan_data
         )
       } else if (y_type == "binary") {
-        sim_out <- rstan::sampling(BIVA.models::logit,
+        sim_out <- rstan::sampling(stanmodels$logit,
           data = private$..stan_data
         )
       }
@@ -201,11 +201,11 @@ biva <- R6::R6Class(
       if (fit) {
         message("Fitting model to the data")
         if (y_type == "real") {
-          private$..stanfit <- rstan::sampling(BIVA.models::Gaussian,
+          private$..stanfit <- rstan::sampling(stanmodels$Gaussian,
             data = stan_data, ...
           )
         } else if (y_type == "binary") {
-          private$..stanfit <- rstan::sampling(BIVA.models::logit,
+          private$..stanfit <- rstan::sampling(stanmodels$logit,
             data = stan_data, ...
           )
         }
