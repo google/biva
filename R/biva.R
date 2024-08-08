@@ -74,8 +74,8 @@ biva <- R6::R6Class(
     #' @param ... Additional arguments for Stan
     #' @return invisible
     initialize = function(data, y, d, z,
-                          x_ymodel,
-                          x_smodel,
+                          x_ymodel = NULL,
+                          x_smodel = NULL,
                           y_type = "real",
                           ER = 1,
                           side = 2,
