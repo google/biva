@@ -55,13 +55,13 @@ CleanData <- function(data,
     xs_ymodel <- paste(x_ymodel, collapse = "+")
     # Build the model formula
     fml_ymodel <- paste0(y, " ~ 1 + ", xs_ymodel)
-    # Extract model matrix and remove intercept
-    X_ymodel <- stats::model.matrix(stats::as.formula(fml_ymodel),
-      data = data
-    )
   } else {
-    X_ymodel <- NULL
+    # Build the model formula
+    fml_ymodel <- paste0(y, " ~ 1")
   }
+  # Extract model matrix and keep intercept
+  X_ymodel <- stats::model.matrix(stats::as.formula(fml_ymodel),
+                                  data = data)
 
   if (!is.null(x_smodel)) {
     xs_smodel <- paste(x_smodel, collapse = "+")
@@ -73,8 +73,7 @@ CleanData <- function(data,
   }
   # Extract model matrix and keep intercept
   X_smodel <- stats::model.matrix(stats::as.formula(fml_smodel),
-    data = data
-  )
+                                  data = data)
 
   # Compute the number of Y-models and S-models
   K_ymodel <- 2 + side * (2 - ER)
