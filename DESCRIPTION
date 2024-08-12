@@ -1,11 +1,11 @@
 Package: biva
 Title: Bayesian Instrumental Variable Analysis
 Version: 0.0.1
-Authors@R:
-    person(given = "Yichi",
-           family = "Zhang",
-           role = c("aut", "cre"),
-           email = "ychzhang@google.com")
+Authors@R: c(
+    person("Yichi", "Zhang", email = "ychzhang@google.com", role = c("aut", "cre")),
+    person("Evan", "Magnusson", email = "emagnusson@google.com", role = c("aut")),
+    person("Maggie", "Wang", email = "maggiemwang@google.com", role = c("aut")),
+    person("Ignacio", "Martinez", email = "martinezig@google.com", role = c("aut")))
 Description: An implementation of Bayesian IV analysis for impact measurement
   created by YouTube's Impact Measurement Team.
 License: Apache License (== 2.0)
