@@ -1,1 +1,21 @@
-usethis::use_github_action()
+            - name: R minimum dependency check
+  # You may pin to the exact commit or the version.
+  # uses: insightsengineering/r-verdepcheck-action@5a7e07c052be128e4e6b201317620c71ed6e4dd2
+  uses: insightsengineering/r-verdepcheck-action@v0.1.0
+  with:
+    # Token to clone dependencies from GitHub repositories.
+    github-token: # optional, default is 
+    # Directory where the checked package has been cloned.
+    repository-path: # optional, default is repository
+    # Optional value of args argument to rcmdcheck::rcmdcheck in form of a string with space as delimeter, e.g. "--no-examples --no-tests".
+    check-args: # optional, default is 
+    # Optional value of build_args argument to rcmdcheck::rcmdcheck in form of a string with space as delimeter, e.g. "--force --keep-empty-dirs".
+    build-args: # optional, default is 
+    # Additional environment variables.
+Example usage:
+  additional-env-vars: |
+    ABC=123
+    XYZ=456
+
+    additional-env-vars: # optional, default is 
+          
