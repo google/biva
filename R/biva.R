@@ -28,6 +28,8 @@ biva <- R6::R6Class(
     ..x_ymodel = NULL,
     ..x_smodel = NULL,
     ..name_ymodel = NULL,
+    ..num_ymodel = NULL,
+    ..num_smodel = NULL,
     ..stanfit = NULL,
     ..mcmc_checks = NULL,
     ..weak_IV = NULL,
@@ -125,6 +127,8 @@ biva <- R6::R6Class(
           "Alwaystaker assigned trt"
         )
       }
+      private$..num_ymodel <- length(private$..name_ymodel)
+      private$..num_smodel <- side + 1
 
       cleaned_data <- CleanData(
         data = data,
@@ -586,10 +590,10 @@ biva <- R6::R6Class(
       }
 
       # Create prediction list if NULL
-      if (is.null(private$..predictions)) {
+      if (is.null(private$..predict_list)) {
         private$..predictions_s <- list()
         private$..predictions_y <- list()
-        private$..predict_list <- list()
+        private$..predict_list <- c()
       }
       # Create group name if NULL
       if (is.null(name)) {
@@ -604,7 +608,7 @@ biva <- R6::R6Class(
       X_ypred <- new_data[, private$..x_ymodel]
 
       # Sample posterior predictives for the S-model
-      N_s <- nrow(X_spred)
+      N <- nrow(new_data)
       s_sim <- purrr::pmap(
         .l = list(
           beta_smodel = purrr::array_branch(private$..beta_smodel, 1)
@@ -614,11 +618,10 @@ biva <- R6::R6Class(
           exp_lin_pred <- cbind(1, exp_lin_pred)
           return(exp_lin_pred / rowSums(exp_lin_pred))
         },
-        X = X_spred, N = N_s
+        X = X_spred, N = N
       )
 
       # Sample posterior predictives for the Y-model
-      N_y <- nrow(X_ypred)
       if (private$..y_type == "real") {
         y_sim <- purrr::pmap(
           .l = list(
@@ -628,7 +631,7 @@ biva <- R6::R6Class(
             lin_pred <- cbind(1, as.matrix(X)) %*% t(as.matrix(beta_ymodel))
             return(lin_pred)
           },
-          X = X_spred, N = N_s
+          X = X_spred, N = N
         )
       } else if (private$..y_type == "binary") {
         y_sim <- purrr::pmap(
@@ -640,14 +643,332 @@ biva <- R6::R6Class(
             prob <- 1 / (1 + exp(-lin_pred))
             return(prob)
           },
-          X = X_spred, N = N_s
+          X = X_spred, N = N
         )
       }
 
-      private$..predict_list[[length(private$..predict_list) + 1]] <- name
+      # Convert to matrix
+      s_sim <- t(matrix(unlist(s_sim), ncol = N, byrow = TRUE))
+      y_sim <- t(matrix(unlist(y_sim), ncol = N, byrow = TRUE))
+
+      private$..predict_list <- c(private$..predict_list, name)
       private$..predictions_s[[name]] <- s_sim
       private$..predictions_y[[name]] <- y_sim
+
+      print(private$..predict_list)
+
       return(invisible(self))
+    },
+
+    #' @description
+    #' Get posterior predictive draws
+
+    #' @param name Group name of the prediction
+    getPred = function(name = NULL, ...) {
+      # Check if predictions exists
+      if (is.null(private$..predictions_s)) {
+        stop("No predictions in the object.")
+      }
+      if (is.null(private$..predictions_y)) {
+        stop("No predictions in the object.")
+      }
+      # If name is NULL, supply the last predicted item.
+      if (is.null(name)) {
+        name <- private$..predict_list[[length(private$..predict_list)]]
+      }
+
+      # If name is not in the list, throw an error
+      if (!(name %in% private$..predict_list)) {
+        stop(name, " is not in the prediction list.")
+      }
+      if (!(name %in% private$..predict_list)) {
+        stop(name, " is not in the prediction list.")
+      }
+
+      pred_list <- list(
+        predictions_s = private$..predictions_s[[name]],
+        predictions_y = private$..predictions_y[[name]]
+      )
+
+      return(pred_list)
+    },
+
+    #' @description
+    #' Get point estimate, credible interval and prob summary of predictive draws
+
+    #' @param name Optional. Group name of the prediction
+    #'  If not provided, will return the summary for the last predicitve draws.
+    #' @param subgroup Optional. A boolean vector to get summary on the
+    #'  conditional group average. Should be the same length as the group size.
+    #' @param median Optional. Logical value.
+    #'  If TRUE (default), the median of the posterior draws is returned.
+    #'  If FALSE, the mean is returned.
+    #' @param width Optional. Numeric value between 0 and 1 representing
+    #'  the desired width of the credible interval
+    #'  (e.g., 0.95 for a 95% credible interval).
+    #' @param round Optional. Integer value indicating the number of decimal
+    #'  places to round the lower and upper bounds of the credible interval.
+    #' @param a Optional. Numeric value representing
+    #'  the lower bound threshold, i.e., to calculate
+    #'  the probability that the group average is greater than a.
+    #' @param b Optional. Upper bound for the threshold.
+
+    #' @return A character string with the following information:
+    #'    Point estimates of the proportion of units being in each of the assumed strata.
+    #'  - Point estimate of the CACE.
+    #'  - Credible interval of the CACE with given probabily.
+    #'  - If a and / or b is supplied, report the probability that
+    #'    the posterior of an effect being greater than,
+    #'    less than, or within a range defined by thresholds.
+    predSummary = function(name = NULL,
+                           subgroup = NULL,
+                           median = TRUE,
+                           width = 0.75,
+                           round = 2,
+                           a = NULL,
+                           b = NULL,
+                           ...) {
+      # Check if predictions exists
+      if (is.null(private$..predictions_s)) {
+        stop("No predictions in the object.")
+      }
+      if (is.null(private$..predictions_y)) {
+        stop("No predictions in the object.")
+      }
+      # If name is NULL, supply the last predicted item.
+      if (is.null(name)) {
+        name <- private$..predict_list[[length(private$..predict_list)]]
+      }
+
+      # If name is not in the list, throw an error
+      if (!(name %in% private$..predict_list)) {
+        stop(name, " is not in the prediction list.")
+      }
+      if (!(name %in% private$..predict_list)) {
+        stop(name, " is not in the prediction list.")
+      }
+
+      # Validate subgroup
+      if (!is.null(subgroup)) {
+        im::validate_logical_vector(subgroup, nrow(private$..predictions_s[[name]]))
+      } else {
+        subgroup <- rep(TRUE, nrow(private$..predictions_s[[name]]))
+      }
+
+      # Get posterior draws of strata probability - compliers
+      ncol_pred_s <- ncol(private$..predictions_s[[name]])
+      prob_c_draws <- (private$..predictions_s[[name]])[subgroup, 
+        (1:ncol_pred_s) %% private$..num_smodel == 1]
+
+      # Get point estimate (mean) of strata probability - compliers
+      point_estimate_prob_c <- mean(prob_c_draws)
+      point_estimate_prob_c <- scales::percent(point_estimate_prob_c)
+      ps_statement_c <- glue::glue(
+        "Given the data, we estimate that for group: {name}, ",
+        "there is a {point_estimate_prob_c} probability that ",
+        "the unit is a complier, "
+      )
+
+      # Get posterior draws of strata probability - other strata
+      if (private$..num_smodel == 2){
+        prob_nt_draws <- (private$..predictions_s[[name]])[subgroup, 
+          (1:ncol_pred_s) %% private$..num_smodel == 0]
+        point_estimate_prob_nt <- mean(prob_nt_draws)
+        point_estimate_prob_nt <- scales::percent(point_estimate_prob_nt)
+        ps_statement_others <- glue::glue(
+          "there is a {point_estimate_prob_nt} probability that ",
+          "the unit is a never-taker. "
+        )
+      } else {
+        prob_nt_draws <- (private$..predictions_s[[name]])[subgroup, 
+          (1:ncol_pred_s) %% private$..num_smodel == 2]
+        prob_at_draws <- (private$..predictions_s[[name]])[subgroup, 
+          (1:ncol_pred_s) %% private$..num_smodel == 0]
+        point_estimate_prob_nt <- mean(prob_nt_draws)
+        point_estimate_prob_nt <- scales::percent(point_estimate_prob_nt)
+        point_estimate_prob_at <- mean(prob_at_draws)
+        point_estimate_prob_at <- scales::percent(point_estimate_prob_at)
+        ps_statement_others <- glue::glue(
+          "there is a {point_estimate_prob_nt} probability that ",
+          "the unit is a never-taker, ",
+          "there is a {point_estimate_prob_at} probability that ",
+          "the unit is a always-taker. ",
+        )
+      }
+     
+      # Get posterior draws of CACEs if predicted to be compliers
+      ncol_pred_y <- ncol(private$..predictions_y[[name]])
+      mean_y_c0_draws <- (private$..predictions_y[[name]])[subgroup, 
+        (1:ncol_pred_y) %% private$..num_ymodel == 1]
+      mean_y_c1_draws <- (private$..predictions_y[[name]])[subgroup, 
+        (1:ncol_pred_y) %% private$..num_ymodel == 2]
+      mean_CACE_draws <- mean_y_c1_draws - mean_y_c0_draws
+      mean_CACE_draws <- colSums(prob_c_draws * mean_CACE_draws) / 
+        colSums(prob_c_draws)
+
+      # Get point estimate (mean) of CACE
+      if (median) {
+        point_estimate_CACE <- median(mean_CACE_draws)
+      } else {
+        point_estimate_CACE <- mean(mean_CACE_draws)
+      }
+      pe_statement_CACE <- glue::glue(
+        "The point estimate of CACE is {round(point_estimate_CACE, round)}. "
+      )
+
+      # Get credible interval
+      credible_interval <- im::credibleInterval(mean_CACE_draws, width)
+      ci_statement <- glue::glue(
+        "With {scales::percent(width)} probability, ",
+        "the CACE is between ",
+        "{round(credible_interval$lower_bound, round)} and ",
+        "{round(credible_interval$upper_bound, round)}. "
+      )
+
+      prob_statement <- calcProb(mean_CACE_draws, a, b,
+        group_name = "group average"
+      )
+
+      statement <- paste(
+        ps_statement_c,
+        ps_statement_others,
+        pe_statement_CACE,
+        ci_statement,
+        prob_statement
+      )
+      return(statement)
+    },
+
+    #' @description
+    #' Compare the average of the posterior draws of two groups
+    #' Return strata probability, point estimate, credible interval
+    #' and prob summary of predictive draws
+
+    #' @param name1 Group name of the prediction to be compared with
+    #' @param name2 Group name of the prediction to be compared with
+    #' @param median Optional. Logical value.
+    #'  If TRUE (default), the median of the posterior draws is returned.
+    #'  If FALSE, the mean is returned.
+    #' @param width Optional. Numeric value between 0 and 1 representing
+    #'  the desired width of the credible interval
+    #'  (e.g., 0.95 for a 95% credible interval).
+    #' @param round Optional. Integer value indicating the number of decimal
+    #'  places to round the lower and upper bounds of the credible interval.
+    #' @param a Optional. Numeric value representing
+    #'  the lower bound threshold, i.e., to calculate
+    #'  the probability that the group average is greater than a.
+    #' @param b Optional. Upper bound for the threshold.
+
+    #' @return Return point estimate, credible interval and prob summary of
+    #' the comparison between two groups
+    predCompare = function(name1, name2,
+                           subgroup1 = NULL,
+                           subgroup2 = NULL,
+                           median = TRUE,
+                           width = 0.75,
+                           round = 2,
+                           a = NULL,
+                           b = NULL,
+                           ...) {
+      # Check if predictions exists
+      if (is.null(private$..predictions_s)) {
+        stop("No predictions in the object.")
+      }
+      if (is.null(private$..predictions_y)) {
+        stop("No predictions in the object.")
+      }
+      if (length(private$..predict_list) < 2) {
+        stop("Less than two groups were predicted.")
+      }
+      # If name is NULL, throw an error.
+      if (is.null(name1) || is.null(name2)) {
+        stop("Group names need to be provided.")
+      }
+      # If name is not in the list, throw an error
+      if (!(name1 %in% private$..predict_list)) {
+        stop(name1, " is not in the prediction list.")
+      }
+      if (!(name2 %in% private$..predict_list)) {
+        stop(name2, " is not in the prediction list.")
+      }
+
+      # Validate subgroup1
+      if (!is.null(subgroup1)) {
+        im::validate_logical_vector(subgroup1, nrow(private$..predictions_s[[name1]]))
+      } else {
+        subgroup1 <- rep(TRUE, nrow(private$..predictions_s[[name1]]))
+      }
+
+      # Validate subgroup2
+      if (!is.null(subgroup2)) {
+        im::validate_logical_vector(subgroup2, nrow(private$..predictions_s[[name2]]))
+      } else {
+        subgroup2 <- rep(TRUE, nrow(private$..predictions_s[[name2]]))
+      }
+
+      # Get posterior draws of CACEs if predicted to be compliers for subgroup1
+      ncol_pred_s1 <- ncol(private$..predictions_s[[name1]])
+      prob_c_draws1 <- (private$..predictions_s[[name1]])[subgroup1, 
+        (1:ncol_pred_s1) %% private$..num_smodel == 1]
+
+      ncol_pred_y1 <- ncol(private$..predictions_y[[name1]])
+      mean_y_c0_draws1 <- (private$..predictions_y[[name1]])[subgroup1, 
+        (1:ncol_pred_y1) %% private$..num_ymodel == 1]
+      mean_y_c1_draws1 <- (private$..predictions_y[[name1]])[subgroup1, 
+        (1:ncol_pred_y1) %% private$..num_ymodel == 2]
+      mean_CACE_draws1 <- mean_y_c1_draws1 - mean_y_c0_draws1
+      mean_CACE_draws1 <- colSums(prob_c_draws1 * mean_CACE_draws1) / 
+        colSums(prob_c_draws1)
+
+      # Get posterior draws of CACEs if predicted to be compliers for subgroup2
+      ncol_pred_s2 <- ncol(private$..predictions_s[[name2]])
+      prob_c_draws2 <- (private$..predictions_s[[name2]])[subgroup2, 
+        (1:ncol_pred_s2) %% private$..num_smodel == 1]
+      
+      ncol_pred_y2 <- ncol(private$..predictions_y[[name2]])
+      mean_y_c0_draws2 <- (private$..predictions_y[[name2]])[subgroup2, 
+        (1:ncol_pred_y2) %% private$..num_ymodel == 1]
+      mean_y_c1_draws2 <- (private$..predictions_y[[name2]])[subgroup2, 
+        (1:ncol_pred_y2) %% private$..num_ymodel == 2]
+      mean_CACE_draws2 <- mean_y_c1_draws2 - mean_y_c0_draws2
+      mean_CACE_draws2 <- colSums(prob_c_draws2 * mean_CACE_draws2) / 
+        colSums(prob_c_draws2)
+
+      # Get posterior draws of group average
+      delta_CACE_draws <- mean_CACE_draws1 - mean_CACE_draws2
+
+      # Get point estimate of posterior draws
+      if (median) {
+        point_estimate_delta_CACE <- median(delta_CACE_draws)
+      } else {
+        point_estimate_delta_CACE <- mean(delta_CACE_draws)
+      }
+      pe_statement <- glue::glue(
+        "Given the data, we estimate that ",
+        "the point estimate of the group difference in CACE ",
+        "is {round(point_estimate_delta_CACE, round)}. "
+      )
+
+      # Get credible interval
+      credible_interval <- im::credibleInterval(delta_CACE_draws, width)
+      ci_statement <- glue::glue(
+        "With {scales::percent(width)} probability, ",
+        "the difference in CACE is between ",
+        "{round(credible_interval$lower_bound, round)} and ",
+        "{round(credible_interval$upper_bound, round)}. "
+      )
+
+      # Calculate prob
+      prob_statement <- calcProb(delta_CACE_draws, a, b,
+        group_name = "group difference in CACE"
+      )
+
+      statement <- paste(
+        pe_statement,
+        ci_statement,
+        prob_statement
+      )
+      return(statement)
     }
   )
 )
