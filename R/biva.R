@@ -189,7 +189,7 @@ biva <- R6::R6Class(
           data = private$..stan_data
         )
       } else if (y_type == "binary") {
-        sim_out <- rstan::sampling(stanmodels$llogistic,
+        sim_out <- rstan::sampling(stanmodels$logistic,
           data = private$..stan_data
         )
       }
@@ -209,7 +209,7 @@ biva <- R6::R6Class(
             data = stan_data, ...
           )
         } else if (y_type == "binary") {
-          private$..stanfit <- rstan::sampling(stanmodels$llogistic,
+          private$..stanfit <- rstan::sampling(stanmodels$logistic,
             data = stan_data, ...
           )
         }
