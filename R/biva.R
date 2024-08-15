@@ -189,7 +189,7 @@ biva <- R6::R6Class(
           data = private$..stan_data
         )
       } else if (y_type == "binary") {
-        sim_out <- rstan::sampling(stanmodels$logit,
+        sim_out <- rstan::sampling(stanmodels$logistic,
           data = private$..stan_data
         )
       }
@@ -209,7 +209,7 @@ biva <- R6::R6Class(
             data = stan_data, ...
           )
         } else if (y_type == "binary") {
-          private$..stanfit <- rstan::sampling(stanmodels$logit,
+          private$..stanfit <- rstan::sampling(stanmodels$logistic,
             data = stan_data, ...
           )
         }
@@ -757,7 +757,7 @@ biva <- R6::R6Class(
 
       # Get posterior draws of strata probability - compliers
       ncol_pred_s <- ncol(private$..predictions_s[[name]])
-      prob_c_draws <- (private$..predictions_s[[name]])[subgroup, 
+      prob_c_draws <- (private$..predictions_s[[name]])[subgroup,
         (1:ncol_pred_s) %% private$..num_smodel == 1]
 
       # Get point estimate (mean) of strata probability - compliers
@@ -771,7 +771,7 @@ biva <- R6::R6Class(
 
       # Get posterior draws of strata probability - other strata
       if (private$..num_smodel == 2){
-        prob_nt_draws <- (private$..predictions_s[[name]])[subgroup, 
+        prob_nt_draws <- (private$..predictions_s[[name]])[subgroup,
           (1:ncol_pred_s) %% private$..num_smodel == 0]
         point_estimate_prob_nt <- mean(prob_nt_draws)
         point_estimate_prob_nt <- scales::percent(point_estimate_prob_nt)
@@ -780,9 +780,9 @@ biva <- R6::R6Class(
           "the unit is a never-taker. "
         )
       } else {
-        prob_nt_draws <- (private$..predictions_s[[name]])[subgroup, 
+        prob_nt_draws <- (private$..predictions_s[[name]])[subgroup,
           (1:ncol_pred_s) %% private$..num_smodel == 2]
-        prob_at_draws <- (private$..predictions_s[[name]])[subgroup, 
+        prob_at_draws <- (private$..predictions_s[[name]])[subgroup,
           (1:ncol_pred_s) %% private$..num_smodel == 0]
         point_estimate_prob_nt <- mean(prob_nt_draws)
         point_estimate_prob_nt <- scales::percent(point_estimate_prob_nt)
@@ -795,15 +795,15 @@ biva <- R6::R6Class(
           "the unit is a always-taker. ",
         )
       }
-     
+
       # Get posterior draws of CACEs if predicted to be compliers
       ncol_pred_y <- ncol(private$..predictions_y[[name]])
-      mean_y_c0_draws <- (private$..predictions_y[[name]])[subgroup, 
+      mean_y_c0_draws <- (private$..predictions_y[[name]])[subgroup,
         (1:ncol_pred_y) %% private$..num_ymodel == 1]
-      mean_y_c1_draws <- (private$..predictions_y[[name]])[subgroup, 
+      mean_y_c1_draws <- (private$..predictions_y[[name]])[subgroup,
         (1:ncol_pred_y) %% private$..num_ymodel == 2]
       mean_CACE_draws <- mean_y_c1_draws - mean_y_c0_draws
-      mean_CACE_draws <- colSums(prob_c_draws * mean_CACE_draws) / 
+      mean_CACE_draws <- colSums(prob_c_draws * mean_CACE_draws) /
         colSums(prob_c_draws)
 
       # Get point estimate (mean) of CACE
@@ -908,30 +908,30 @@ biva <- R6::R6Class(
 
       # Get posterior draws of CACEs if predicted to be compliers for subgroup1
       ncol_pred_s1 <- ncol(private$..predictions_s[[name1]])
-      prob_c_draws1 <- (private$..predictions_s[[name1]])[subgroup1, 
+      prob_c_draws1 <- (private$..predictions_s[[name1]])[subgroup1,
         (1:ncol_pred_s1) %% private$..num_smodel == 1]
 
       ncol_pred_y1 <- ncol(private$..predictions_y[[name1]])
-      mean_y_c0_draws1 <- (private$..predictions_y[[name1]])[subgroup1, 
+      mean_y_c0_draws1 <- (private$..predictions_y[[name1]])[subgroup1,
         (1:ncol_pred_y1) %% private$..num_ymodel == 1]
-      mean_y_c1_draws1 <- (private$..predictions_y[[name1]])[subgroup1, 
+      mean_y_c1_draws1 <- (private$..predictions_y[[name1]])[subgroup1,
         (1:ncol_pred_y1) %% private$..num_ymodel == 2]
       mean_CACE_draws1 <- mean_y_c1_draws1 - mean_y_c0_draws1
-      mean_CACE_draws1 <- colSums(prob_c_draws1 * mean_CACE_draws1) / 
+      mean_CACE_draws1 <- colSums(prob_c_draws1 * mean_CACE_draws1) /
         colSums(prob_c_draws1)
 
       # Get posterior draws of CACEs if predicted to be compliers for subgroup2
       ncol_pred_s2 <- ncol(private$..predictions_s[[name2]])
-      prob_c_draws2 <- (private$..predictions_s[[name2]])[subgroup2, 
+      prob_c_draws2 <- (private$..predictions_s[[name2]])[subgroup2,
         (1:ncol_pred_s2) %% private$..num_smodel == 1]
-      
+
       ncol_pred_y2 <- ncol(private$..predictions_y[[name2]])
-      mean_y_c0_draws2 <- (private$..predictions_y[[name2]])[subgroup2, 
+      mean_y_c0_draws2 <- (private$..predictions_y[[name2]])[subgroup2,
         (1:ncol_pred_y2) %% private$..num_ymodel == 1]
-      mean_y_c1_draws2 <- (private$..predictions_y[[name2]])[subgroup2, 
+      mean_y_c1_draws2 <- (private$..predictions_y[[name2]])[subgroup2,
         (1:ncol_pred_y2) %% private$..num_ymodel == 2]
       mean_CACE_draws2 <- mean_y_c1_draws2 - mean_y_c0_draws2
-      mean_CACE_draws2 <- colSums(prob_c_draws2 * mean_CACE_draws2) / 
+      mean_CACE_draws2 <- colSums(prob_c_draws2 * mean_CACE_draws2) /
         colSums(prob_c_draws2)
 
       # Get posterior draws of group average
