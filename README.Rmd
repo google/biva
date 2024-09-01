@@ -1,0 +1,41 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# {biva}: Bayesian Instrumental Variable Analysis <img src="man/figures/logo.png" align="right" height="138" alt="" />
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+Randomized experiments are the gold standard for impact measurement.
+However, it is common that the treatment of interest cannot be
+directly randomized, like the usage of a feature, or participation in a program.
+Instead, nudges to use the feature or join the program are randomly assigned
+to induce the treatment of interest, but units can choose not to comply
+with the assignment, hindering simple analysis. This package, BIVA
+(Bayesian instrumental variable analysis), helps unlock flexible
+impact measurement for randomized experiments with noncompliance.
+
+## Installation
+
+You can install the development version of biva from [GitHub](https://github.com/google/biva) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("google/biva")
+```
+
+## Example
+
+Examples for how to apply the BIVA workflow can be found in the 'vignettes' folder.
