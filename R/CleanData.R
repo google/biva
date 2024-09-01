@@ -23,6 +23,8 @@
 #' @param z Name of the treatment assigned variable (character; numeric 0 or 1).
 #' @param x_ymodel Names of the covariates to include in the Y-model (character vector, optional).
 #' @param x_smodel Names of the covariates to include in the S-model (character vector, optional).
+#' @param ER The assumption of exclusion restriction (numeric; 1 if assumed, 0 otherwise).
+#' @param side The number of noncompliance sides (numeric; 1 or 2).
 #'
 #' @return A list containing the cleaned dataset and relevant metadata:
 #'  * \code{N}: The number of observations after cleaning.
@@ -33,6 +35,8 @@
 #'  * \code{Y} The dependent variable vector (outcome variable).
 #'  * \code{X_ymodel} The cleaned covariate matrix in the Y-model (including intercept).
 #'  * \code{X_smodel} The cleaned covariate matrix in the S-model (including intercept).
+#'  * \code{K_ymodel} The number of Y-models.
+#'  * \code{K_smodel} The number of S-models.
 #' @export
 
 CleanData <- function(data,

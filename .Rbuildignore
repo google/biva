@@ -1,2 +1,13 @@
-^biva\.Rproj$
+^.*\.Rproj$
 ^\.Rproj\.user$
+^LICENSE\.md$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^CRAN-SUBMISSION$
+^doc$
+^Meta$
+CONTRIBUTING.md
+^README\.Rmd$
+LICENSE
+^cran-comments\.md$
