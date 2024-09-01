@@ -2,6 +2,10 @@
 title: "Bayesian Instrumental Variable analysis for Binary Outcomes"
 author: "Yichi Zhang"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Bayesian Instrumental Variable analysis for Binary Outcomes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}

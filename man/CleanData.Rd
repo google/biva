@@ -27,6 +27,10 @@ CleanData(
 \item{x_ymodel}{Names of the covariates to include in the Y-model (character vector, optional).}
 
 \item{x_smodel}{Names of the covariates to include in the S-model (character vector, optional).}
+
+\item{ER}{The assumption of exclusion restriction (numeric; 1 if assumed, 0 otherwise).}
+
+\item{side}{The number of noncompliance sides (numeric; 1 or 2).}
 }
 \value{
 A list containing the cleaned dataset and relevant metadata:
@@ -39,6 +43,8 @@ A list containing the cleaned dataset and relevant metadata:
 \item \code{Y} The dependent variable vector (outcome variable).
 \item \code{X_ymodel} The cleaned covariate matrix in the Y-model (including intercept).
 \item \code{X_smodel} The cleaned covariate matrix in the S-model (including intercept).
+\item \code{K_ymodel} The number of Y-models.
+\item \code{K_smodel} The number of S-models.
 }
 }
 \description{

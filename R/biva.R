@@ -13,7 +13,7 @@
 # limitations under the License.
 
 #' @title Bayesian Instrument Variable Analysis
-#' @docType class
+#' @description Create and analyze Bayesian Instrumental Variable models
 #' @export
 #' @field version BIVA package version used to fit model
 
@@ -562,10 +562,10 @@ biva <- R6::R6Class(
 
     #' @description
     #' Predict new data
-
     #' @param new_data Data frame to be predicted
     #' @param name Group name of the prediction
     #' @param M Number of posterior draws to sample from
+    #' @param ... Additional arguments passed to internal functions
     predict = function(new_data, name = NULL, M = NULL, ...) {
       # Check new_data contains correct columns
       cols <- c(private$..x_smodel, private$..x_ymodel)
@@ -664,7 +664,7 @@ biva <- R6::R6Class(
     #' Get posterior predictive draws
 
     #' @param name Group name of the prediction
-    getPred = function(name = NULL, ...) {
+    getPred = function(name = NULL) {
       # Check if predictions exists
       if (is.null(private$..predictions_s)) {
         stop("No predictions in the object.")
@@ -726,8 +726,7 @@ biva <- R6::R6Class(
                            width = 0.75,
                            round = 2,
                            a = NULL,
-                           b = NULL,
-                           ...) {
+                           b = NULL) {
       # Check if predictions exists
       if (is.null(private$..predictions_s)) {
         stop("No predictions in the object.")
@@ -858,7 +857,10 @@ biva <- R6::R6Class(
     #'  the lower bound threshold, i.e., to calculate
     #'  the probability that the group average is greater than a.
     #' @param b Optional. Upper bound for the threshold.
-
+    #' @param subgroup1 Optional. A boolean vector to get summary on the
+    #' conditional group average for the first group.
+    #' @param subgroup2 Optional. A boolean vector to get summary on the
+    #' conditional group average for the second group.
     #' @return Return point estimate, credible interval and prob summary of
     #' the comparison between two groups
     predCompare = function(name1, name2,
@@ -868,8 +870,7 @@ biva <- R6::R6Class(
                            width = 0.75,
                            round = 2,
                            a = NULL,
-                           b = NULL,
-                           ...) {
+                           b = NULL) {
       # Check if predictions exists
       if (is.null(private$..predictions_s)) {
         stop("No predictions in the object.")

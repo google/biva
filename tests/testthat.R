@@ -13,6 +13,6 @@
 # limitations under the License.
 
 library(testthat)
-library(BIVA)
+library(biva)
 
-test_check("BIVA")
+test_check("biva")

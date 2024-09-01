@@ -2,6 +2,10 @@
 title: "Bayesian Instrumental Variable analysis for Continuous Outcomes"
 author: "Yichi Zhang"
 output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Bayesian Instrumental Variable analysis for Continuous Outcomes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
