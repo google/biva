@@ -214,7 +214,7 @@ biva <- R6::R6Class(
           )
         }
 
-        private$..mcmc_checks <- im::mcmcChecks$new(
+        private$..mcmc_checks <- imt::mcmcChecks$new(
           fit = private$..stanfit,
           pars = "mean_outcome"
         )
@@ -409,7 +409,7 @@ biva <- R6::R6Class(
     #'     returns a formatted statement summarizing the findings.
     #'
     credibleInterval = function(width = 0.75, round = 2) {
-      private$..credible_interval <- im::credibleInterval(
+      private$..credible_interval <- imt::credibleInterval(
         draws = private$..CACE_draws, width
       )
       statement <- glue::glue(
@@ -750,7 +750,7 @@ biva <- R6::R6Class(
 
       # Validate subgroup
       if (!is.null(subgroup)) {
-        im::validate_logical_vector(subgroup, nrow(private$..predictions_s[[name]]))
+        imt::validate_logical_vector(subgroup, nrow(private$..predictions_s[[name]]))
       } else {
         subgroup <- rep(TRUE, nrow(private$..predictions_s[[name]]))
       }
@@ -817,7 +817,7 @@ biva <- R6::R6Class(
       )
 
       # Get credible interval
-      credible_interval <- im::credibleInterval(mean_CACE_draws, width)
+      credible_interval <- imt::credibleInterval(mean_CACE_draws, width)
       ci_statement <- glue::glue(
         "With {scales::percent(width)} probability, ",
         "the CACE is between ",
@@ -894,14 +894,14 @@ biva <- R6::R6Class(
 
       # Validate subgroup1
       if (!is.null(subgroup1)) {
-        im::validate_logical_vector(subgroup1, nrow(private$..predictions_s[[name1]]))
+        imt::validate_logical_vector(subgroup1, nrow(private$..predictions_s[[name1]]))
       } else {
         subgroup1 <- rep(TRUE, nrow(private$..predictions_s[[name1]]))
       }
 
       # Validate subgroup2
       if (!is.null(subgroup2)) {
-        im::validate_logical_vector(subgroup2, nrow(private$..predictions_s[[name2]]))
+        imt::validate_logical_vector(subgroup2, nrow(private$..predictions_s[[name2]]))
       } else {
         subgroup2 <- rep(TRUE, nrow(private$..predictions_s[[name2]]))
       }
@@ -950,7 +950,7 @@ biva <- R6::R6Class(
       )
 
       # Get credible interval
-      credible_interval <- im::credibleInterval(delta_CACE_draws, width)
+      credible_interval <- imt::credibleInterval(delta_CACE_draws, width)
       ci_statement <- glue::glue(
         "With {scales::percent(width)} probability, ",
         "the difference in CACE is between ",

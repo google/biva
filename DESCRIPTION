@@ -20,7 +20,7 @@ Imports:
     ggplot2,
     ggpubr,
     glue,
-    im,
+    imt,
     methods,
     purrr,
     Rcpp,
