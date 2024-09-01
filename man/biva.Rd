@@ -30,6 +30,9 @@ Bayesian Instrument Variable Analysis
 \item \href{#method-biva-lollipop}{\code{biva$lollipop()}}
 \item \href{#method-biva-plotPrior}{\code{biva$plotPrior()}}
 \item \href{#method-biva-predict}{\code{biva$predict()}}
+\item \href{#method-biva-getPred}{\code{biva$getPred()}}
+\item \href{#method-biva-predSummary}{\code{biva$predSummary()}}
+\item \href{#method-biva-predCompare}{\code{biva$predCompare()}}
 \item \href{#method-biva-clone}{\code{biva$clone()}}
 }
 }
@@ -37,14 +40,15 @@ Bayesian Instrument Variable Analysis
 \if{html}{\out{<a id="method-biva-new"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-new}{}}}
 \subsection{Method \code{new()}}{
+Create a new Bayesian Instrumental Variable Analysis object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$new(
   data,
   y,
   d,
   z,
-  x_ymodel,
-  x_smodel,
+  x_ymodel = NULL,
+  x_smodel = NULL,
   y_type = "real",
   ER = 1,
   side = 2,
@@ -60,83 +64,257 @@ Bayesian Instrument Variable Analysis
 )}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{data}}{A data.frame containing the data to be cleaned.}
+
+\item{\code{y}}{Name of the dependent variable (character; numeric).}
+
+\item{\code{d}}{Name of the treatment received variable (character; numeric 0 or 1).}
+
+\item{\code{z}}{Name of the treatment assigned variable (character; numeric 0 or 1).}
+
+\item{\code{x_ymodel}}{Names of the covariates to include in the Y-model (character vector, optional).}
+
+\item{\code{x_smodel}}{Names of the covariates to include in the S-model (character vector, optional).}
+
+\item{\code{y_type}}{The type of the dependent variable ("real" or "binary")}
+
+\item{\code{ER}}{The assumption of exclusion restriction (ER = 1 if assumed, 0 otherwise)}
+
+\item{\code{side}}{The number of noncompliance sides (1 or 2)}
+
+\item{\code{beta_mean_ymodel}}{The prior means for coefficients in the Y-models including intercept (numeric matrix; dimension = # outcome models x # covariates)}
+
+\item{\code{beta_sd_ymodel}}{The prior standard deviations for coefficients in the Y-models including intercept (numeric matrix; dimension = # outcome models x # covariates)}
+
+\item{\code{beta_mean_smodel}}{The prior means for coefficients in the S-models including intercept (numeric matrix; dimension = (# strata - 1) x # covariates)}
+
+\item{\code{beta_sd_smodel}}{The prior standard deviations for coefficients in the S-models including intercept (numeric matrix; dimension = (# strata - 1) x # covariates)}
+
+\item{\code{sigma_shape_ymodel}}{The prior shape for standard deviation of errors in the Y-models (numeric vector; length = # outcome models)}
+
+\item{\code{sigma_scale_ymodel}}{The prior scale for standard deviation of errors in the Y-models (numeric vector; length = # outcome models)}
+
+\item{\code{seed}}{Seed for Stan fitting}
+
+\item{\code{fit}}{Flag for fitting the data to the model or not (1 if fit, 0 otherwise)}
+
+\item{\code{...}}{Additional arguments for Stan}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+invisible
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-tracePlot"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-tracePlot}{}}}
 \subsection{Method \code{tracePlot()}}{
+Plot MCMC trace for the mean outcomes in each strata.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$tracePlot(...)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Additional arguments for Stan}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A ggplot object.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-weakIVTest"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-weakIVTest}{}}}
 \subsection{Method \code{weakIVTest()}}{
+Perform a weak instrument test.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$weakIVTest()}\if{html}{\out{</div>}}
 }
 
+\subsection{Returns}{
+A character string summarizing the test result and warnings
+if the instrument is tested weak.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-strataProbEstimate"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-strataProbEstimate}{}}}
 \subsection{Method \code{strataProbEstimate()}}{
+Calculates the probability of a unit being in each of the assumed strata.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$strataProbEstimate()}\if{html}{\out{</div>}}
 }
 
+\subsection{Returns}{
+A character string summarizing the estimated probability
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-calcProb"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-calcProb}{}}}
 \subsection{Method \code{calcProb()}}{
+Calculates the posterior probability of
+the complier average causal effect (CACE)
+being greater than, less than,
+or within a range defined by thresholds.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$calcProb(a = 0, b = NULL, prior = FALSE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{a}}{Optional. Lower bound for the threshold.}
+
+\item{\code{b}}{Optional. Upper bound for the threshold.}
+
+\item{\code{prior}}{Logical. If TRUE, calculates probabilities based on
+the prior distribution.
+If FALSE (default), uses the posterior distribution.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A character string summarizing the estimated probability
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-pointEstimate"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-pointEstimate}{}}}
 \subsection{Method \code{pointEstimate()}}{
+Calculates point estimate of the complier average causal effect (CACE).
+
+This R6 method calculates the point estimate of the effect size
+based on the posterior draws of the CACE parameter.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$pointEstimate(median = TRUE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{median}}{Logical value. If TRUE (default), the median of
+the CACE draws is returned. If FALSE, the mean is returned.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+This method uses the private$..mean_outcome internal variable
+which contains MCMC draws of the mean outcome parameters in each
+strata, based on which the CACE parameter is calculated.
+Depending on the specified median argument, the method
+calculates and returns either the median or the mean of the draws.
+}
+
+\subsection{Returns}{
+A numeric value representing the point estimate.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-credibleInterval"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-credibleInterval}{}}}
 \subsection{Method \code{credibleInterval()}}{
+Calculates credible interval for the complier average causal effect (CACE).
+
+This R6 method calculates and returns a formatted statement summarizing
+the credible interval of a specified width for the effect of the intervention.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$credibleInterval(width = 0.75, round = 2)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{width}}{Numeric value between 0 and 1 representing the desired
+width of the credible interval (e.g., 0.95 for a 95\% credible interval).}
+
+\item{\code{round}}{Integer value indicating the number of decimal places to round
+the lower and upper bounds of the credible interval.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+This method uses the private$..mean_outcome internal variable
+which contains MCMC draws of the mean outcome parameters in each
+strata, based on which the CACE parameter is calculated.
+It calculates the credible interval, stores it internally, and
+returns a formatted statement summarizing the findings.
+}
+
+\subsection{Returns}{
+A character string with the following information:
+\itemize{
+\item The probability associated with the specified width
+\item The lower and upper bounds of the credible interval, rounded to the
+specified number of decimal places
+}
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-vizdraws"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-vizdraws}{}}}
 \subsection{Method \code{vizdraws()}}{
+Plots the prior and posterior distributions
+for the complier average causal effect (CACE).
+
+For more details see \code{\link[vizdraws:vizdraws]{vizdraws::vizdraws()}}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$vizdraws(...)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{other arguments passed to vizdraws.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+An interactive plot of the prior and posterior distributions.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-lollipop"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-lollipop}{}}}
 \subsection{Method \code{lollipop()}}{
+Plots lollipop chart for the prior and posterior of
+the complier average causal effect (CACE) being
+greater or less than a threshold.
+
+For more details see \code{\link[vizdraws:lollipops]{vizdraws::lollipops()}}.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$lollipop(threshold = 0, ...)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{threshold}}{cutoff used to calculate the probability. Defaults to
+zero}
+
+\item{\code{...}}{other arguments passed to vizdraws.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A lollipop chart with the prior and posterior probability of
+the CACE being above or below a threshold.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-plotPrior"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-plotPrior}{}}}
 \subsection{Method \code{plotPrior()}}{
+Plots draws from the prior distribution of probability of
+a unit being in each of the assumed strata, and the
+complier average causal effect (CACE).
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$plotPrior()}\if{html}{\out{</div>}}
 }
@@ -146,10 +324,150 @@ Bayesian Instrument Variable Analysis
 \if{html}{\out{<a id="method-biva-predict"></a>}}
 \if{latex}{\out{\hypertarget{method-biva-predict}{}}}
 \subsection{Method \code{predict()}}{
+Predict new data
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{biva$predict(new_data, name = NULL, M = NULL, ...)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{new_data}}{Data frame to be predicted}
+
+\item{\code{name}}{Group name of the prediction}
+
+\item{\code{M}}{Number of posterior draws to sample from}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-biva-getPred"></a>}}
+\if{latex}{\out{\hypertarget{method-biva-getPred}{}}}
+\subsection{Method \code{getPred()}}{
+Get posterior predictive draws
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{biva$getPred(name = NULL, ...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{name}}{Group name of the prediction}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-biva-predSummary"></a>}}
+\if{latex}{\out{\hypertarget{method-biva-predSummary}{}}}
+\subsection{Method \code{predSummary()}}{
+Get point estimate, credible interval and prob summary of predictive draws
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{biva$predSummary(
+  name = NULL,
+  subgroup = NULL,
+  median = TRUE,
+  width = 0.75,
+  round = 2,
+  a = NULL,
+  b = NULL,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{name}}{Optional. Group name of the prediction
+If not provided, will return the summary for the last predicitve draws.}
+
+\item{\code{subgroup}}{Optional. A boolean vector to get summary on the
+conditional group average. Should be the same length as the group size.}
+
+\item{\code{median}}{Optional. Logical value.
+If TRUE (default), the median of the posterior draws is returned.
+If FALSE, the mean is returned.}
+
+\item{\code{width}}{Optional. Numeric value between 0 and 1 representing
+the desired width of the credible interval
+(e.g., 0.95 for a 95\% credible interval).}
+
+\item{\code{round}}{Optional. Integer value indicating the number of decimal
+places to round the lower and upper bounds of the credible interval.}
+
+\item{\code{a}}{Optional. Numeric value representing
+the lower bound threshold, i.e., to calculate
+the probability that the group average is greater than a.}
+
+\item{\code{b}}{Optional. Upper bound for the threshold.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A character string with the following information:
+Point estimates of the proportion of units being in each of the assumed strata.
+\itemize{
+\item Point estimate of the CACE.
+\item Credible interval of the CACE with given probabily.
+\item If a and / or b is supplied, report the probability that
+the posterior of an effect being greater than,
+less than, or within a range defined by thresholds.
+}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-biva-predCompare"></a>}}
+\if{latex}{\out{\hypertarget{method-biva-predCompare}{}}}
+\subsection{Method \code{predCompare()}}{
+Compare the average of the posterior draws of two groups
+Return strata probability, point estimate, credible interval
+and prob summary of predictive draws
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{biva$predCompare(
+  name1,
+  name2,
+  subgroup1 = NULL,
+  subgroup2 = NULL,
+  median = TRUE,
+  width = 0.75,
+  round = 2,
+  a = NULL,
+  b = NULL,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{name1}}{Group name of the prediction to be compared with}
+
+\item{\code{name2}}{Group name of the prediction to be compared with}
+
+\item{\code{median}}{Optional. Logical value.
+If TRUE (default), the median of the posterior draws is returned.
+If FALSE, the mean is returned.}
+
+\item{\code{width}}{Optional. Numeric value between 0 and 1 representing
+the desired width of the credible interval
+(e.g., 0.95 for a 95\% credible interval).}
+
+\item{\code{round}}{Optional. Integer value indicating the number of decimal
+places to round the lower and upper bounds of the credible interval.}
+
+\item{\code{a}}{Optional. Numeric value representing
+the lower bound threshold, i.e., to calculate
+the probability that the group average is greater than a.}
+
+\item{\code{b}}{Optional. Upper bound for the threshold.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Return point estimate, credible interval and prob summary of
+the comparison between two groups
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-biva-clone"></a>}}
