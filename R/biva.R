@@ -39,13 +39,17 @@ biva <- R6::R6Class(
     ..strata_prob = NULL,
     ..mean_outcome = NULL,
     ..CACE_draws = NULL,
+    ..NTACE_draws = NULL,
+    ..ATACE_draws = NULL,
     ..credible_interval = NULL,
     ..predict_list = NULL,
     ..predictions_s = NULL,
     ..predictions_y = NULL,
     ..prior_mean_outcome = NULL,
     ..prior_strata_prob = NULL,
-    ..prior_CACE = NULL
+    ..prior_CACE = NULL,
+    ..prior_NTACE = NULL,
+    ..prior_ATACE = NULL
   ),
   active = list(
     version = function() {
@@ -202,6 +206,21 @@ biva <- R6::R6Class(
       private$..prior_CACE <-
         private$..prior_mean_outcome[, 2] - private$..prior_mean_outcome[, 1]
 
+      if (ER == 1 & side == 1) {
+        private$..prior_NTACE <- 0
+      } else if (ER == 1 & side == 2) {
+        private$..prior_NTACE <- 0
+        private$..prior_ATACE <- 0
+      } else if (ER == 0 & side == 1) {
+        private$..prior_NTACE <-
+        private$..prior_mean_outcome[, 4] - private$..prior_mean_outcome[, 3]
+      } else if (ER == 0 & side == 2) {
+        private$..prior_NTACE <-
+        private$..prior_mean_outcome[, 4] - private$..prior_mean_outcome[, 3]
+        private$..prior_ATACE <-
+        private$..prior_mean_outcome[, 6] - private$..prior_mean_outcome[, 5]
+      }
+      
       if (fit) {
         message("Fitting model to the data")
         if (y_type == "real") {
@@ -241,6 +260,21 @@ biva <- R6::R6Class(
           private$..mean_outcome[, 2] - private$..mean_outcome[, 1]
       }
 
+      if (ER == 1 & side == 1) {
+        private$..NTACE_draws <- 0
+      } else if (ER == 1 & side == 2) {
+        private$..NTACE_draws <- 0
+        private$..ATACE_draws <- 0
+      } else if (ER == 0 & side == 1) {
+        private$..NTACE_draws <-
+        private$..mean_outcome[, 4] - private$..mean_outcome[, 3]
+      } else if (ER == 0 & side == 2) {
+        private$..NTACE_draws <-
+        private$..mean_outcome[, 4] - private$..mean_outcome[, 3]
+        private$..ATACE_draws <-
+        private$..mean_outcome[, 6] - private$..mean_outcome[, 5]
+      }
+      
       return(invisible())
     },
 
@@ -363,31 +397,154 @@ biva <- R6::R6Class(
     },
 
     #' @description
-    #' Calculates point estimate of the complier average causal effect (CACE).
+    #' Calculates the posterior probability of
+    #' the never-taker average causal effect (NTACE) of the nudge
+    #' among never-takers being greater than, less than,
+    #' or within a range defined by thresholds.
+    #'
+    #' @param a Optional. Lower bound for the threshold.
+    #' @param b Optional. Upper bound for the threshold.
+    #' @param prior Logical. If TRUE, calculates probabilities based on
+    #' the prior distribution.
+    #'        If FALSE (default), uses the posterior distribution.
+    #'
+    #' @return  A character string summarizing the estimated probability
+    #'
+    #'
+    calcProbNT = function(a = 0, b = NULL, prior = FALSE) {
+      # Input validation (same as before)
+      if (is.null(a) && is.null(b)) {
+        stop("Either 'a' or 'b' must be provided.")
+      }
+      if (!is.null(a) && !is.null(b) && b <= a) {
+        stop("'b' must be greater than 'a'.")
+      }
+      if (prior) {
+        NTACE_draws <- private$..prior_NTACE
+        txt <- "Our prior is"
+      } else {
+        NTACE_draws <- private$..NTACE_draws
+        txt <- "Given the data, we estimate"
+      }
+      if (!is.null(a) && is.null(b)) {
+        p <- scales::percent(mean(NTACE_draws > a))
+        statement <- glue::glue(
+          "{txt} that the ",
+          "probability that the effect is more than {a}",
+          " is {p}."
+        )
+      } else if (is.null(a) && !is.null(b)) {
+        p <- mean(NTACE_draws < b)
+        statement <- glue::glue(
+          "{txt} that the probability that the",
+          " effect is less than {b} is {p}."
+        )
+      } else { # both 'a' and 'b' are present
+        p <- mean(NTACE_draws > a & NTACE_draws < b)
+        statement <- glue::glue(
+          "{txt} that the probability that the effect",
+          " is between {a} and {b} is {p}."
+        )
+      }
+      return(statement)
+    },
+
+    #' @description
+    #' Calculates the posterior probability of
+    #' the always-taker average causal effect (ATACE) of the nudge
+    #' among always-takers being greater than, less than,
+    #' or within a range defined by thresholds.
+    #'
+    #' @param a Optional. Lower bound for the threshold.
+    #' @param b Optional. Upper bound for the threshold.
+    #' @param prior Logical. If TRUE, calculates probabilities based on
+    #' the prior distribution.
+    #'        If FALSE (default), uses the posterior distribution.
+    #'
+    #' @return  A character string summarizing the estimated probability
+    #'
+    #'
+    calcProbAT = function(a = 0, b = NULL, prior = FALSE) {
+      # Input validation (same as before)
+      if (is.null(a) && is.null(b)) {
+        stop("Either 'a' or 'b' must be provided.")
+      }
+      if (!is.null(a) && !is.null(b) && b <= a) {
+        stop("'b' must be greater than 'a'.")
+      }
+      if (side == 1) {
+        stop("One-sided noncompliance is assumed, there is no always-taker.")
+      }
+      if (prior) {
+        ATACE_draws <- private$..prior_ATACE
+        txt <- "Our prior is"
+      } else {
+        ATACE_draws <- private$..ATACE_draws
+        txt <- "Given the data, we estimate"
+      }
+      if (!is.null(a) && is.null(b)) {
+        p <- scales::percent(mean(ATACE_draws > a))
+        statement <- glue::glue(
+          "{txt} that the ",
+          "probability that the effect is more than {a}",
+          " is {p}."
+        )
+      } else if (is.null(a) && !is.null(b)) {
+        p <- mean(ATACE_draws < b)
+        statement <- glue::glue(
+          "{txt} that the probability that the",
+          " effect is less than {b} is {p}."
+        )
+      } else { # both 'a' and 'b' are present
+        p <- mean(ATACE_draws > a & ATACE_draws < b)
+        statement <- glue::glue(
+          "{txt} that the probability that the effect",
+          " is between {a} and {b} is {p}."
+        )
+      }
+      return(statement)
+    },
+
+    #' @description
+    #' Calculates point estimate of the complier average causal effect (CACE),
+    #' never-taker average causal effect (NTACE), or always-taker average causal effect (ATACE).
     #'
     #' This R6 method calculates the point estimate of the effect size
-    #' based on the posterior draws of the CACE parameter.
+    #' based on the posterior draws of the effect parameter.
     #'
     #' @param median Logical value. If TRUE (default), the median of
-    #'     the CACE draws is returned. If FALSE, the mean is returned.
+    #'     the effect draws is returned. If FALSE, the mean is returned.
     #'
     #' @return A numeric value representing the point estimate.
     #'
     #' @details This method uses the private$..mean_outcome internal variable
     #'     which contains MCMC draws of the mean outcome parameters in each
-    #'     strata, based on which the CACE parameter is calculated.
+    #'     strata, based on which the effect parameter is calculated.
     #'     Depending on the specified median argument, the method
     #'     calculates and returns either the median or the mean of the draws.
-    pointEstimate = function(median = TRUE) {
+    pointEstimate = function(median = TRUE, target = "CACE") {
       if (median) {
-        return(median(private$..CACE_draws))
+        if (target == "CACE") {
+          return(median(private$..CACE_draws))
+        } else if (target == "NTACE") {
+          return(median(private$..NTACE_draws))
+        } else if (target == "ATACE") {
+          return(median(private$..ATACE_draws))
+        }
       } else {
-        return(mean(private$..CACE_draws))
+          if (target == "CACE") {
+            return(mean(private$..CACE_draws))
+          } else if (target == "NTACE") {
+            return(mean(private$..NTACE_draws))
+          } else if (target == "ATACE") {
+            return(mean(private$..ATACE_draws))
+          }
       }
     },
 
     #' @description
-    #' Calculates credible interval for the complier average causal effect (CACE).
+    #' Calculates credible interval for the complier average causal effect (CACE),
+    #' never-taker average causal effect (NTACE), or always-taker average causal effect (ATACE).
     #'
     #' This R6 method calculates and returns a formatted statement summarizing
     #' the credible interval of a specified width for the effect of the intervention.
@@ -404,17 +561,28 @@ biva <- R6::R6Class(
     #'
     #' @details This method uses the private$..mean_outcome internal variable
     #'     which contains MCMC draws of the mean outcome parameters in each
-    #'     strata, based on which the CACE parameter is calculated.
+    #'     strata, based on which the CACE, NTACE, or ATACE parameters are calculated.
     #'     It calculates the credible interval, stores it internally, and
     #'     returns a formatted statement summarizing the findings.
     #'
-    credibleInterval = function(width = 0.75, round = 2) {
-      private$..credible_interval <- imt::credibleInterval(
-        draws = private$..CACE_draws, width
-      )
+    credibleInterval = function(width = 0.75, round = 2, target = "CACE") {
+      if (target == "CACE") {
+        private$..credible_interval <- imt::credibleInterval(
+          draws = private$..CACE_draws, width
+        )
+      } else if (target == "NTACE") {
+        private$..credible_interval <- imt::credibleInterval(
+          draws = private$..NTACE_draws, width
+        )
+      } else if (target == "ATACE") {
+        private$..credible_interval <- imt::credibleInterval(
+          draws = private$..ATACE_draws, width
+        )
+      }
+
       statement <- glue::glue(
         "Given the data, we estimate that there is a ",
-        "{scales::percent(width)} probability that the CACE is between ",
+        "{scales::percent(width)} probability that the effect is between ",
         "{round(private$..credible_interval$lower_bound, round)} and ",
         "{round(private$..credible_interval$upper_bound, round)}."
       )
@@ -423,15 +591,27 @@ biva <- R6::R6Class(
 
     #' @description
     #' Plots the prior and posterior distributions
-    #' for the complier average causal effect (CACE).
+    #' for the complier average causal effect (CACE),
+    #' never-taker average causal effect (NTACE), 
+    #' or always-taker average causal effect (ATACE).
     #'
     #' For more details see [vizdraws::vizdraws()].
     #' @param ... other arguments passed to vizdraws.
     #' @return An interactive plot of the prior and posterior distributions.
-    vizdraws = function(...) {
+    vizdraws = function(target = "CACE",...) {
+      if (target == "CACE") {
+        prior_effect <- private$..prior_CACE
+        posterior_effect = private$..CACE_draws
+      } else if (target == "NTACE") {
+        prior_effect <- private$..prior_NTACE
+        posterior_effect = private$..NTACE_draws
+      } else if (target == "ATACE") {
+        prior_effect <- private$..prior_ATACE
+        posterior_effect = private$..ATACE_draws
+      }
       p <- vizdraws::vizdraws(
-        prior = private$..prior_CACE,
-        posterior = private$..CACE_draws, ...
+        prior = prior_effect,
+        posterior = posterior_effect, ...
       )
       return(p)
     },
@@ -447,12 +627,26 @@ biva <- R6::R6Class(
     #' @param ... other arguments passed to vizdraws.
     #' @return A lollipop chart with the prior and posterior probability of
     #' the CACE being above or below a threshold.
-    lollipop = function(threshold = 0, ...) {
-      data <- data.frame(
-        Name = "CACE",
-        Prior = mean(private$..prior_CACE > threshold),
-        Posterior = mean(private$..CACE_draws > threshold)
-      )
+    lollipop = function(threshold = 0, target = "CACE", ...) {
+      if (target == "CACE"){
+        data <- data.frame(
+          Name = "CACE",
+          Prior = mean(private$..prior_CACE > threshold),
+          Posterior = mean(private$..CACE_draws > threshold)
+        )
+      } else if (target == "NTACE") {
+        data <- data.frame(
+          Name = "NTACE",
+          Prior = mean(private$..prior_NTACE > threshold),
+          Posterior = mean(private$..NTACE_draws > threshold)
+        )
+      } else if (target == "ATACE") {
+        data <- data.frame(
+          Name = "ATACE",
+          Prior = mean(private$..prior_ATACE > threshold),
+          Posterior = mean(private$..ATACE_draws > threshold)
+        )
+      }
       p <- vizdraws::lollipops(data, ...)
       return(p)
     },
