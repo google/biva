@@ -1,0 +1,254 @@
+---
+title: "Bayesian Instrumental Variable analysis for Count Outcomes"
+author: "Yichi Zhang"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Bayesian Instrumental Variable analysis for Count Outcomes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = TRUE
+)
+```
+
+## Motivation
+
+### The Challenge with Count Outcomes
+
+In many experimental settings, the outcome of interest is a **count variable** rather than a continuous measure.
+
+Standard Instrumental Variable (IV) methods (like 2SLS) often treat outcomes as continuous. When applied to count data, linear models can be problematic because:
+
+1.  **Impossible Predictions:** They may predict negative counts.
+2.  **Skewness:** Count data is often highly right-skewed with many zeros.
+3.  **Mean-Variance Relationship:** Unlike Gaussian data, the variance of count data often increases with the mean (heteroscedasticity).
+
+### The BIVA Solution
+
+The **BIVA** package supports `y_type = "count"` to handle these cases explicitly using a **Negative Binomial** model. This approach:
+
+  * Uses a **log-link** function to ensure predictions are always non-negative.
+  * Estimates a **dispersion parameter ($\phi$)** to account for over-dispersion (where Variance \> Mean), which is common in real-world data and often violates simple Poisson assumptions.
+  * Calculates the **CACE** (Complier Average Causal Effect) on the interpretable **natural count scale** (difference in expected counts), not just the log scale.
+
+-----
+
+## Workflow Demonstration
+
+```{r start, message=FALSE, warning=FALSE}
+library(BIVA)
+library(ggplot2)
+library(MASS) # For naive GLM comparison
+```
+
+### Data Simulation
+
+We simulate data for a hypothetical experiment:
+
+  * **Z (Instrument):** A randomized email "nudge" sent to users.
+  * **D (Treatment):** Whether the user actually used the new feature.
+  * **Y (Outcome):** The number of times the user logged in over the next month (Count).
+  * **Compliance:** Two-sided noncompliance (Compliers, Never-takers, Always-takers).
+
+We generate the data using a Negative Binomial process where the treatment increases the expected count of logins for Compliers.
+
+```{r data_sim}
+set.seed(2025)
+n <- 1000
+
+# Covariates: X (Observed), U (Unobserved Confounder)
+X <- rnorm(n)
+U <- rbinom(n, 1, 0.5)
+
+# S-model: Principal Strata (1:Complier, 2:Never-taker, 3:Always-taker)
+# U affects compliance (confounding)
+true.PS <- rep(0, n)
+U1.ind <- (U == 1); U0.ind <- (U == 0)
+
+# U=1 increases prob of being a Complier
+true.PS[U1.ind] <- t(rmultinom(sum(U1.ind), 1, c(0.50, 0.40, 0.10))) %*% c(1, 2, 3)
+# U=0 decreases prob of being a Complier
+true.PS[U0.ind] <- t(rmultinom(sum(U0.ind), 1, c(0.30, 0.60, 0.10))) %*% c(1, 2, 3)
+
+# Treatment Assignment (Z) & Receipt (D)
+Z <- c(rep(0, n/2), rep(1, n/2))
+D <- rep(0, n)
+
+# Strata definitions
+c.trt.ind <- (true.PS == 1) & (Z == 1)
+c.ctrl.ind <- (true.PS == 1) & (Z == 0)
+nt.ind <- (true.PS == 2)
+at.ind <- (true.PS == 3)
+
+# D is 1 for Treated Compliers and Always-takers
+D[c.trt.ind] <- 1
+D[at.ind] <- 1
+
+# Y-model: Negative Binomial Outcome
+# Log link: log(mu) = intercept + beta*X + gamma*U
+# True Dispersion phi = 5
+phi_true <- 5
+Y <- rep(0, n)
+
+# Compliers (Control): Baseline ~ exp(2.0) = 7.4 logins
+Y[c.ctrl.ind] <- rnbinom(sum(c.ctrl.ind), 
+                         mu = exp(2.0 + 0.3*X[c.ctrl.ind] - 0.5*U[c.ctrl.ind]), 
+                         size = phi_true)
+
+# Compliers (Treated): Effect ~ exp(2.5) = 12.2 logins
+# True CACE on Count Scale ~ 12.2 - 7.4 = 4.8 additional logins
+Y[c.trt.ind] <- rnbinom(sum(c.trt.ind), 
+                        mu = exp(2.5 + 0.3*X[c.trt.ind] - 0.5*U[c.trt.ind]), 
+                        size = phi_true)
+
+# Never-takers: High baseline ~ exp(2.8) = 16.4 logins
+Y[nt.ind] <- rnbinom(sum(nt.ind), 
+                     mu = exp(2.8 + 0.3*X[nt.ind] - 0.5*U[nt.ind]), 
+                     size = phi_true)
+
+# Always-takers: Low baseline ~ exp(1.5) = 4.5 logins
+Y[at.ind] <- rnbinom(sum(at.ind), 
+                     mu = exp(1.5 + 0.3*X[at.ind] - 0.5*U[at.ind]), 
+                     size = phi_true)
+
+df <- data.frame(Y = Y, Z = Z, D = D, X = X, U = U)
+
+# Visualize the count distribution
+ggplot(df, aes(x = Y, fill = factor(D))) +
+  geom_histogram(binwidth = 1, alpha = 0.6, position = "identity") +
+  labs(title = "Distribution of Login Counts by Treatment Received", x = "Logins", fill = "Treatment (D)") +
+  theme_minimal()
+```
+
+### Naive Analysis (Biased)
+
+First, we attempt a standard generalized linear model (GLM) using Negative Binomial regression, treating the received treatment $D$ as exogenous. This ignores the unobserved confounder $U$.
+
+```{r naive_glm}
+# Naive Negative Binomial Regression (As-Treated)
+naive_model <- MASS::glm.nb(Y ~ D + X, data = df)
+summary(naive_model)$coefficients["D",,drop=FALSE]
+```
+
+The naive estimate is likely biased because $D$ is correlated with $U$ (confounding). In our simulation, users who are "Always-takers" (who take D=1) have systematically lower baseline outcomes, pulling the naive estimate down.
+
+### BIVA Analysis
+
+We now use BIVA to recover the causal effect. We specify `y_type = "count"` and provide priors for the dispersion parameter $\phi$.
+
+#### Prior Specification
+
+We use `side = 2` (Two-sided noncompliance) and `ER = 1` (Exclusion Restriction assumed).
+
+  * **Outcomes:** We estimate 4 models (Complier-Control, Complier-Treated, Never-taker, Always-taker).
+  * **Phi:** We use a Gamma prior for the dispersion parameter.
+
+<!-- end list -->
+
+```{r fit_biva}
+# Setup Priors
+K_y <- 4 # 4 Outcome models
+P_y <- 2 # Intercept + X
+
+# Weakly informative priors for coefficients
+beta_mean_y <- matrix(0, K_y, P_y)
+beta_mean_y[, 1] <- 2.0 # Intercept prior (log scale)
+beta_sd_y <- matrix(2, K_y, P_y)
+
+# Priors for Strata selection
+beta_mean_s <- matrix(0, 2, 2)
+beta_sd_s <- matrix(1, 2, 2)
+
+# Priors for Phi (Gamma shape/rate). Mean = shape/rate = 5/1 = 5.
+phi_shape <- rep(5, K_y)
+phi_rate <- rep(1, K_y)
+
+# Initialize and Fit
+ivobj <- biva$new(
+  data = df,
+  y = "Y", d = "D", z = "Z",
+  x_ymodel = c("X"),
+  x_smodel = c("X"),
+  y_type = "count",          # <--- Key Argument
+  ER = 1,
+  side = 2,
+  beta_mean_ymodel = beta_mean_y,
+  beta_sd_ymodel = beta_sd_y,
+  beta_mean_smodel = beta_mean_s,
+  beta_sd_smodel = beta_sd_s,
+  phi_shape_ymodel = phi_shape,
+  phi_rate_ymodel = phi_rate,
+  fit = TRUE,
+  iter = 2000, chains = 4, seed = 2025
+)
+```
+
+### Diagnostics
+
+We check the trace plots to ensure the MCMC chains have converged for the mean outcome parameters.
+
+```{r trace_plot, fig.align='center'}
+ivobj$tracePlot()
+```
+
+We also check for weak instruments, which can inflate variance in IV models.
+
+```{r weak_iv}
+ivobj$weakIVTest()
+```
+
+### Results and Causal Estimates
+
+We can now extract the **CACE** (Complier Average Causal Effect).
+
+**Note:** In the context of count data, BIVA calculates the CACE as the **difference in expected counts** ($E[Y(1)] - E[Y(0)]$) for the complier population. This provides a highly interpretable metric (e.g., "The feature caused 4.5 extra logins").
+
+```{r results}
+# Strata Probabilities
+ivobj$strataProbEstimate()
+
+# Point Estimate (Median CACE)
+cat("Estimated CACE (Median difference in counts): ", round(ivobj$pointEstimate(median = TRUE), 2))
+
+# Credible Interval (95%)
+ivobj$credibleInterval(width = 0.95)
+
+# Probability of Positive Effect
+ivobj$calcProb(a = 0)
+```
+
+The BIVA model successfully recovers a CACE close to the true simulated effect (approx 4.8), correcting for the bias seen in the naive analysis.
+
+### Subgroup Prediction
+
+A powerful feature of BIVA is estimating effects for specific user subgroups. For example, we can estimate the compliance probability and causal effect specifically for users with a high value of covariate $X$ (e.g., highly active users).
+
+```{r prediction}
+# Create a subgroup of users with X > 1
+high_activity_users <- df[df$X > 1, ]
+
+# Predict
+ivobj$predict(new_data = high_activity_users, name = "High_Activity")
+
+# Summarize
+print(ivobj$predSummary(name = "High_Activity"))
+```
+
+This summary tells us the specific proportion of compliers within this high-activity group and the expected lift in logins for them.
+
+-----
+
+#### Conclusion
+
+BIVA's extension to count outcomes allows for robust causal inference in settings with discrete, over-dispersed data. By modeling the data generating process explicitly with Negative Binomial distributions, we avoid the pitfalls of linear approximations and obtain interpretable results on the natural count scale.
+
+---
+
+#### BIVA
+
+Licensed under the Apache License, Version 2.0.\
