@@ -36,6 +36,7 @@ biva <- R6::R6Class(
     ..beta_ymodel = NULL,
     ..beta_smodel = NULL,
     ..sigma = NULL,
+    ..phi = NULL,
     ..strata_prob = NULL,
     ..mean_outcome = NULL,
     ..CACE_draws = NULL,
@@ -73,8 +74,10 @@ biva <- R6::R6Class(
     #' @param beta_sd_ymodel The prior standard deviations for coefficients in the Y-models including intercept (numeric matrix; dimension = # outcome models x # covariates)
     #' @param beta_mean_smodel The prior means for coefficients in the S-models including intercept (numeric matrix; dimension = (# strata - 1) x # covariates)
     #' @param beta_sd_smodel The prior standard deviations for coefficients in the S-models including intercept (numeric matrix; dimension = (# strata - 1) x # covariates)
-    #' @param sigma_shape_ymodel The prior shape for standard deviation of errors in the Y-models (numeric vector; length = # outcome models)
-    #' @param sigma_scale_ymodel The prior scale for standard deviation of errors in the Y-models (numeric vector; length = # outcome models)
+    #' @param sigma_shape_ymodel The prior shape for standard deviation of errors in the Y-models (numeric vector; length = # outcome models). Only used if y_type == "real".
+    #' @param sigma_scale_ymodel The prior scale for standard deviation of errors in the Y-models (numeric vector; length = # outcome models). Only used if y_type == "real".
+    #' @param phi_shape_ymodel The prior shape for dispersion parameter in the Y-models (numeric vector; length = # outcome models). Only used if y_type == "count".
+    #' @param phi_rate_ymodel The prior rate for dispersion parameter in the Y-models (numeric vector; length = # outcome models). Only used if y_type == "count".
     #' @param seed Seed for Stan fitting
     #' @param fit Flag for fitting the data to the model or not (1 if fit, 0 otherwise)
     #' @param ... Additional arguments for Stan
@@ -89,8 +92,10 @@ biva <- R6::R6Class(
                           beta_sd_ymodel,
                           beta_mean_smodel,
                           beta_sd_smodel,
-                          sigma_shape_ymodel,
-                          sigma_scale_ymodel,
+                          sigma_shape_ymodel = NULL,
+                          sigma_scale_ymodel = NULL,
+                          phi_shape_ymodel = NULL,
+                          phi_rate_ymodel = NULL,
                           seed = 1997,
                           fit = TRUE,
                           ...) {
@@ -184,6 +189,28 @@ biva <- R6::R6Class(
           beta_sd_smodel = beta_sd_smodel,
           run_estimation = 0
         )
+      } else if (y_type == "count") {
+        # New stan_data block for count
+        stan_data <- list(
+          N = cleaned_data$N,
+          P_ymodel = cleaned_data$P_ymodel,
+          P_smodel = cleaned_data$P_smodel,
+          Z = cleaned_data$Z,
+          D = cleaned_data$D,
+          Y = cleaned_data$Y,
+          X_ymodel = cleaned_data$X_ymodel,
+          X_smodel = cleaned_data$X_smodel,
+          ER = ER,
+          K_ymodel = cleaned_data$K_ymodel,
+          K_smodel = cleaned_data$K_smodel,
+          beta_mean_ymodel = beta_mean_ymodel,
+          beta_sd_ymodel = beta_sd_ymodel,
+          beta_mean_smodel = beta_mean_smodel,
+          beta_sd_smodel = beta_sd_smodel,
+          phi_shape_ymodel = phi_shape_ymodel,
+          phi_rate_ymodel = phi_rate_ymodel,
+          run_estimation = 0
+        )
       }
 
       private$..stan_data <- stan_data
@@ -194,6 +221,10 @@ biva <- R6::R6Class(
         )
       } else if (y_type == "binary") {
         sim_out <- rstan::sampling(stanmodels$logistic,
+          data = private$..stan_data
+        )
+      } else if (y_type == "count") {
+        sim_out <- rstan::sampling(BIVA.models::negbin,
           data = private$..stan_data
         )
       }
@@ -231,6 +262,10 @@ biva <- R6::R6Class(
           private$..stanfit <- rstan::sampling(stanmodels$logistic,
             data = stan_data, ...
           )
+        } else if (y_type == "count") {
+          private$..stanfit <- rstan::sampling(BIVA.models::negbin,
+            data = stan_data, ...
+          )
         }
 
         private$..mcmc_checks <- imt::mcmcChecks$new(
@@ -247,6 +282,9 @@ biva <- R6::R6Class(
         if (y_type == "real") {
           private$..sigma <-
             rstan::extract(private$..stanfit)$"sigma"
+        } else if (y_type == "count") {
+          private$..phi <-
+            rstan::extract(private$..stanfit)$"phi"
         }
 
         private$..strata_prob <-
@@ -836,6 +874,18 @@ biva <- R6::R6Class(
             lin_pred <- cbind(1, as.matrix(X)) %*% t(as.matrix(beta_ymodel))
             prob <- 1 / (1 + exp(-lin_pred))
             return(prob)
+          },
+          X = X_spred, N = N
+        )
+      } else if (private$..y_type == "count") {
+        y_sim <- purrr::pmap(
+          .l = list(
+            beta_ymodel = purrr::array_branch(private$..beta_ymodel, 1)
+          ),
+          .f = function(beta_ymodel, X, N) {
+            lin_pred <- cbind(1, as.matrix(X)) %*% t(as.matrix(beta_ymodel))
+            # For Negative Binomial with log link, the expected mean is exp(linear_predictor)
+            return(exp(lin_pred))
           },
           X = X_spred, N = N
         )
