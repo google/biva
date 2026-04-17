@@ -25,6 +25,7 @@
 #' @param x_smodel Names of the covariates to include in the S-model (character vector, optional).
 #' @param ER The assumption of exclusion restriction (numeric; 1 if assumed, 0 otherwise).
 #' @param side The number of noncompliance sides (numeric; 1 or 2).
+#' @param group Name of the grouping variable for hierarchical modeling (character, optional).
 #'
 #' @return A list containing the cleaned dataset and relevant metadata:
 #'  * \code{N}: The number of observations after cleaning.
@@ -35,6 +36,10 @@
 #'  * \code{Y} The dependent variable vector (outcome variable).
 #'  * \code{X_ymodel} The cleaned covariate matrix in the Y-model (including intercept).
 #'  * \code{X_smodel} The cleaned covariate matrix in the S-model (including intercept).
+#'  * \code{group_idx} The numeric index of the group for each unit (1 to J).
+#'  * \code{J} The total number of unique groups.
+#'  * \code{group_levels} The original levels of the grouping variable.
+#'  * \code{use_hierarchical} Flag (0 or 1) indicating if hierarchical modeling is enabled.
 #'  * \code{K_ymodel} The number of Y-models.
 #'  * \code{K_smodel} The number of S-models.
 #' @export
@@ -54,6 +59,20 @@ CleanData <- function(data,
   Z <- dplyr::pull(data, z)
   X_ymodel <- dplyr::select(data, tidyselect::all_of(x_ymodel))
   X_smodel <- dplyr::select(data, tidyselect::all_of(x_smodel))
+
+  if (!is.null(group)) {
+    group_vec <- dplyr::pull(data, group)
+    group_factor <- as.factor(group_vec)
+    group_idx <- as.numeric(group_factor)
+    J <- length(unique(group_idx))
+    group_levels <- levels(group_factor)
+    use_hierarchical <- 1
+  } else {
+    group_idx <- rep(1, nrow(data))
+    J <- 1
+    group_levels <- NULL
+    use_hierarchical <- 0
+  }
 
   if (!is.null(x_ymodel)) {
     xs_ymodel <- paste(x_ymodel, collapse = "+")
@@ -92,6 +111,10 @@ CleanData <- function(data,
     Y = Y,
     X_ymodel = X_ymodel,
     X_smodel = X_smodel,
+    group_idx = group_idx,
+    J = J,
+    group_levels = group_levels,
+    use_hierarchical = use_hierarchical,
     K_ymodel = K_ymodel,
     K_smodel = K_smodel
   )
