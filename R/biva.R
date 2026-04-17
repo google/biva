@@ -35,6 +35,13 @@ biva <- R6::R6Class(
     ..weak_IV = NULL,
     ..beta_ymodel = NULL,
     ..beta_smodel = NULL,
+    ..alpha_ymodel = NULL,
+    ..tau_ymodel = NULL,
+    ..group_idx = NULL,
+    ..J = NULL,
+    ..use_hierarchical = NULL,
+    ..group = NULL,
+    ..group_levels = NULL,
     ..sigma = NULL,
     ..phi = NULL,
     ..strata_prob = NULL,
@@ -55,6 +62,18 @@ biva <- R6::R6Class(
   active = list(
     version = function() {
       return(private$..version)
+    },
+    predict_list = function() {
+      return(private$..predict_list)
+    },
+    CACE_draws = function() {
+      return(private$..CACE_draws)
+    },
+    NTACE_draws = function() {
+      return(private$..NTACE_draws)
+    },
+    ATACE_draws = function() {
+      return(private$..ATACE_draws)
     }
   ),
   public = list(
@@ -67,6 +86,7 @@ biva <- R6::R6Class(
     #' @param z Name of the treatment assigned variable (character; numeric 0 or 1).
     #' @param x_ymodel Names of the covariates to include in the Y-model (character vector, optional).
     #' @param x_smodel Names of the covariates to include in the S-model (character vector, optional).
+    #' @param group Name of the grouping variable for hierarchical modeling (character, optional).
     #' @param y_type The type of the dependent variable ("real" or "binary")
     #' @param ER The assumption of exclusion restriction (ER = 1 if assumed, 0 otherwise)
     #' @param side The number of noncompliance sides (1 or 2)
@@ -85,6 +105,7 @@ biva <- R6::R6Class(
     initialize = function(data, y, d, z,
                           x_ymodel = NULL,
                           x_smodel = NULL,
+                          group = NULL,
                           y_type = "real",
                           ER = 1,
                           side = 2,
@@ -146,9 +167,16 @@ biva <- R6::R6Class(
         z = z,
         x_ymodel = x_ymodel,
         x_smodel = x_smodel,
+        group = group,
         ER = ER,
         side = side
       )
+      private$..group_idx <- cleaned_data$group_idx
+      private$..J <- cleaned_data$J
+      private$..use_hierarchical <- cleaned_data$use_hierarchical
+      private$..group <- group
+      private$..group_levels <- cleaned_data$group_levels
+      
       if (y_type == "real") {
         stan_data <- list(
           N = cleaned_data$N,
@@ -159,6 +187,9 @@ biva <- R6::R6Class(
           Y = cleaned_data$Y,
           X_ymodel = cleaned_data$X_ymodel,
           X_smodel = cleaned_data$X_smodel,
+          group_idx = cleaned_data$group_idx,
+          J = cleaned_data$J,
+          use_hierarchical = cleaned_data$use_hierarchical,
           ER = ER,
           K_ymodel = cleaned_data$K_ymodel,
           K_smodel = cleaned_data$K_smodel,
@@ -180,6 +211,9 @@ biva <- R6::R6Class(
           Y = cleaned_data$Y,
           X_ymodel = cleaned_data$X_ymodel,
           X_smodel = cleaned_data$X_smodel,
+          group_idx = cleaned_data$group_idx,
+          J = cleaned_data$J,
+          use_hierarchical = cleaned_data$use_hierarchical,
           ER = ER,
           K_ymodel = cleaned_data$K_ymodel,
           K_smodel = cleaned_data$K_smodel,
@@ -200,6 +234,9 @@ biva <- R6::R6Class(
           Y = cleaned_data$Y,
           X_ymodel = cleaned_data$X_ymodel,
           X_smodel = cleaned_data$X_smodel,
+          group_idx = cleaned_data$group_idx,
+          J = cleaned_data$J,
+          use_hierarchical = cleaned_data$use_hierarchical,
           ER = ER,
           K_ymodel = cleaned_data$K_ymodel,
           K_smodel = cleaned_data$K_smodel,
@@ -278,6 +315,12 @@ biva <- R6::R6Class(
 
         private$..beta_smodel <-
           rstan::extract(private$..stanfit)$"beta_smodel"
+
+        private$..alpha_ymodel <-
+          rstan::extract(private$..stanfit)$"alpha_ymodel_raw"
+
+        private$..tau_ymodel <-
+          rstan::extract(private$..stanfit)$"tau_ymodel"
 
         if (y_type == "real") {
           private$..sigma <-
@@ -379,6 +422,78 @@ biva <- R6::R6Class(
         )
       }
       return(statement)
+    },
+
+    #' @description
+    #' Provides a summary of the group-level causal effects (CACE) for each group.
+    #'
+    #' @param median Logical value. If TRUE (default), the median of the effect
+    #' draws is used for point estimates. If FALSE, the mean is used.
+    #' @param width Numeric value between 0 and 1 representing the desired width
+    #' of the credible interval (default: 0.75).
+    #' @param a Numeric value representing the threshold for posterior probability
+    #' calculation (default: 0).
+    #' @param round Integer value indicating the number of decimal places to round
+    #' result values.
+    #'
+    #' @return A data.frame containing group-level summaries:
+    #' - group: The level of the grouping variable.
+    #' - point_estimate: Median/mean CACE for the group.
+    #' - lower_bound: Lower bound of the credible interval.
+    #' - upper_bound: Upper bound of the credible interval.
+    #' - prob_greater_than_a: Posterior probability that CACE > a.
+    groupSummary = function(median = TRUE, width = 0.75, a = 0, round = 2) {
+      if (is.null(private$..alpha_ymodel) || private$..use_hierarchical == 0) {
+        warning("The model was not fit with groups or hierarchical modeling was disabled. Returning global summary logic.")
+        return(NULL)
+      }
+
+      num_draws <- dim(private$..alpha_ymodel)[1]
+      J <- private$..J
+      results <- data.frame()
+
+      # For each group, calculate the CACE
+      # Since alpha is a random intercept added to the linear predictor:
+      # Y_model_k = X_ymodel * beta_ymodel_k + alpha_ymodel_k
+      # For a general group summary, we use the average covariate profile
+      avg_X_ymodel <- colMeans(private$..stan_data$X_ymodel)
+
+      for (j in 1:J) {
+        # Linear predictors for compliers in group j
+        # CACE = E[Y|C, Z=1, group=j] - E[Y|C, Z=0, group=j]
+
+        # alpha_ymodel is actually alpha_ymodel_raw from stan
+        alpha_c0 <- private$..alpha_ymodel[, j, 1] * private$..tau_ymodel[, 1]
+        alpha_c1 <- private$..alpha_ymodel[, j, 2] * private$..tau_ymodel[, 2]
+
+        lp_c0 <- (as.matrix(private$..beta_ymodel[, 1, ]) %*% avg_X_ymodel) + alpha_c0
+        lp_c1 <- (as.matrix(private$..beta_ymodel[, 2, ]) %*% avg_X_ymodel) + alpha_c1
+
+        if (private$..y_type == "real") {
+          group_CACE_draws <- lp_c1 - lp_c0
+        } else if (private$..y_type == "binary") {
+          group_CACE_draws <- (1 / (1 + exp(-lp_c1))) - (1 / (1 + exp(-lp_c0)))
+        } else if (private$..y_type == "count") {
+          group_CACE_draws <- exp(lp_c1) - exp(lp_c0)
+        }
+        
+        group_CACE_draws <- as.numeric(drop(group_CACE_draws))
+
+        pe <- if (median) median(group_CACE_draws) else mean(group_CACE_draws)
+        ci <- imt::credibleInterval(group_CACE_draws, width)
+        prob <- mean(group_CACE_draws > a)
+
+        results <- rbind(results, data.frame(
+          group = private$..group_levels[j],
+          point_estimate = unname(round(pe, round)),
+          lower_bound = unname(round(ci$lower_bound, round)),
+          upper_bound = unname(round(ci$upper_bound, round)),
+          prob_greater_than_a = unname(round(prob, 4)),
+          row.names = NULL
+        ))
+      }
+      rownames(results) <- NULL
+      return(results)
     },
 
     #' @description
@@ -839,6 +954,18 @@ biva <- R6::R6Class(
       X_spred <- new_data[, private$..x_smodel]
       X_ypred <- new_data[, private$..x_ymodel]
 
+      # Handle group indices if hierarchical
+      if (private$..use_hierarchical == 1) {
+        if (!private$..group %in% colnames(new_data)) {
+          stop(paste0("Group column '", private$..group, "' is missing from new_data."))
+        }
+        g_vec <- new_data[[private$..group]]
+        g_idx <- as.numeric(factor(g_vec, levels = private$..group_levels))
+        if (any(is.na(g_idx))) {
+          warning("Some groups in new_data were not present in the training data. Predictions for these groups will only use fixed effects.")
+        }
+      }
+
       # Sample posterior predictives for the S-model
       N <- nrow(new_data)
       s_sim <- purrr::pmap(
@@ -854,43 +981,43 @@ biva <- R6::R6Class(
       )
 
       # Sample posterior predictives for the Y-model
-      if (private$..y_type == "real") {
-        y_sim <- purrr::pmap(
-          .l = list(
-            beta_ymodel = purrr::array_branch(private$..beta_ymodel, 1)
-          ),
-          .f = function(beta_ymodel, X, N) {
-            lin_pred <- cbind(1, as.matrix(X)) %*% t(as.matrix(beta_ymodel))
-            return(lin_pred)
-          },
-          X = X_spred, N = N
-        )
-      } else if (private$..y_type == "binary") {
-        y_sim <- purrr::pmap(
-          .l = list(
-            beta_ymodel = purrr::array_branch(private$..beta_ymodel, 1)
-          ),
-          .f = function(beta_ymodel, X, N) {
-            lin_pred <- cbind(1, as.matrix(X)) %*% t(as.matrix(beta_ymodel))
-            prob <- 1 / (1 + exp(-lin_pred))
-            return(prob)
-          },
-          X = X_spred, N = N
-        )
-      } else if (private$..y_type == "count") {
-        y_sim <- purrr::pmap(
-          .l = list(
-            beta_ymodel = purrr::array_branch(private$..beta_ymodel, 1)
-          ),
-          .f = function(beta_ymodel, X, N) {
-            lin_pred <- cbind(1, as.matrix(X)) %*% t(as.matrix(beta_ymodel))
-            # For Negative Binomial with log link, the expected mean is exp(linear_predictor)
-            return(exp(lin_pred))
-          },
-          X = X_spred, N = N
-        )
+      # Prepare parameters for pmap
+      pmap_l <- list(
+        beta_ymodel = purrr::array_branch(private$..beta_ymodel, 1)
+      )
+      if (private$..use_hierarchical == 1) {
+        pmap_l$alpha_ymodel <- purrr::array_branch(private$..alpha_ymodel, 1)
+        pmap_l$tau_ymodel <- purrr::array_branch(private$..tau_ymodel, 1)
       }
 
+      y_sim_func <- function(beta_ymodel, X, N, alpha_ymodel = NULL, tau_ymodel = NULL, g_idx = NULL) {
+        lin_pred <- cbind(1, as.matrix(X)) %*% t(as.matrix(beta_ymodel))
+        if (!is.null(alpha_ymodel) && !is.null(tau_ymodel) && !is.null(g_idx)) {
+          # alpha_ymodel is J x K, tau_ymodel is K
+          # Use only known groups, others get 0 random effect
+          re <- matrix(0, nrow = length(g_idx), ncol = length(tau_ymodel))
+          known_idx <- !is.na(g_idx)
+          if (any(known_idx)) {
+            re[known_idx, ] <- sweep(alpha_ymodel[g_idx[known_idx], , drop = FALSE], 2, tau_ymodel, "*")
+          }
+          lin_pred <- lin_pred + re
+        }
+        
+        if (private$..y_type == "real") {
+          return(lin_pred)
+        } else if (private$..y_type == "binary") {
+          return(1 / (1 + exp(-lin_pred)))
+        } else if (private$..y_type == "count") {
+          return(exp(lin_pred))
+        }
+      }
+
+      y_sim <- purrr::pmap(
+        .l = pmap_l,
+        .f = y_sim_func,
+        X = X_ypred, N = N, g_idx = if (private$..use_hierarchical == 1) g_idx else NULL
+      )
+        
       # Convert to matrix
       s_sim <- t(matrix(unlist(s_sim), ncol = N, byrow = TRUE))
       y_sim <- t(matrix(unlist(y_sim), ncol = N, byrow = TRUE))
