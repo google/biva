@@ -51,6 +51,12 @@ data {
     real<lower=0> sigma_scale_ymodel[K_ymodel];
     // Flag for running estimation (0: no, 1: yes)
     int<lower=0, upper=1> run_estimation;
+	// Flag for using hierarchical modeling (0: no, 1: yes)
+    int<lower=0, upper=1> use_hierarchical;
+    // The number of groups for hierarchical modeling
+    int<lower=1> J;
+    // The group index for each observation
+    int<lower=1, upper=J> group_idx[N];
 }
 
 transformed data {
@@ -169,6 +175,10 @@ parameters {
     matrix[K_smodel, P_smodel] beta_smodel;
     // standard deviations of error in the Y-models
     real<lower=0> sigma[K_ymodel];
+	// random effects in the Y-models (group-level deviations)
+    matrix[J, K_ymodel] alpha_ymodel_raw;
+    // standard deviation of the random effects
+    vector<lower=0>[K_ymodel] tau_ymodel;
 }
 
 model {
@@ -185,6 +195,15 @@ model {
     }
     for (k in 1:K_ymodel) {
     	sigma[k] ~ inv_gamma(sigma_shape_ymodel[k],sigma_scale_ymodel[k]);
+	}
+    // hierarchical priors
+    if (use_hierarchical == 1) {
+      to_vector(alpha_ymodel_raw) ~ normal(0, 1);
+      tau_ymodel ~ normal(0, 1);
+    } else {
+      // Park parameters with standard priors to avoid initialization issues
+      to_vector(alpha_ymodel_raw) ~ normal(0, 1);
+      tau_ymodel ~ normal(0, 1);
     }
 
     if (run_estimation==1) {
@@ -214,22 +233,22 @@ model {
       real log_l[length];
       if (Z[n] == 0 && D[n] == 0) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M00[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M00[l]]', sigma[M00[l]]);
+            log_l[l] = log_prob[S[M00[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M00[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M00[l]] * tau_ymodel[M00[l]] : 0.0), sigma[M00[l]]);
           }
       }
       else if (Z[n] == 1 && D[n] == 0) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M10[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M10[l]]', sigma[M10[l]]);
+            log_l[l] = log_prob[S[M10[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M10[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M10[l]] * tau_ymodel[M10[l]] : 0.0), sigma[M10[l]]);
           }
       }
       else if (Z[n] == 1 && D[n] == 1) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M11[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M11[l]]', sigma[M11[l]]);
+            log_l[l] = log_prob[S[M11[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M11[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M11[l]] * tau_ymodel[M11[l]] : 0.0), sigma[M11[l]]);
           }
       }
       else if (Z[n] == 0 && D[n] == 1) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M01[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M01[l]]', sigma[M01[l]]);
+            log_l[l] = log_prob[S[M01[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M01[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M01[l]] * tau_ymodel[M01[l]] : 0.0), sigma[M01[l]]);
           }
       }
       target += log_sum_exp(log_l) - log_sum_exp(log_prob);
@@ -260,7 +279,7 @@ generated quantities {
 
         for (n in 1:N)
             for (k in 1:K_ymodel)
-                expected_mean[n, k] = X_ymodel[n] * beta_ymodel[k]';
+                expected_mean[n, k] = X_ymodel[n] * beta_ymodel[k]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], k] * tau_ymodel[k] : 0.0);
 
 	      // aggregate individual level predictions for the average probability and outcomes
         for (k in 1:(K_smodel+1)) {

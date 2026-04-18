@@ -47,6 +47,12 @@ data {
     matrix[K_smodel, P_smodel] beta_sd_smodel;
     // Flag for running estimation (0: no, 1: yes)
     int<lower=0, upper=1> run_estimation;
+	// Flag for using hierarchical modeling (0: no, 1: yes)
+    int<lower=0, upper=1> use_hierarchical;
+    // The number of groups for hierarchical modeling
+    int<lower=1> J;
+    // The group index for each observation
+    int<lower=1, upper=J> group_idx[N];
 }
 
 transformed data {
@@ -163,6 +169,10 @@ parameters {
     matrix[K_ymodel, P_ymodel] beta_ymodel;
     // coefficients in the S-models (including intercept)
     matrix[K_smodel, P_smodel] beta_smodel;
+	// random effects in the Y-models (group-level deviations)
+    matrix[J, K_ymodel] alpha_ymodel_raw;
+    // standard deviation of the random effects
+    vector<lower=0>[K_ymodel] tau_ymodel;
 }
 
 model {
@@ -176,6 +186,15 @@ model {
     	for (p in 1:P_ymodel) {
     		beta_ymodel[k, p] ~ normal(beta_mean_ymodel[k,p], beta_sd_ymodel[k,p]);
     	}
+	}
+    // hierarchical priors
+    if (use_hierarchical == 1) {
+      to_vector(alpha_ymodel_raw) ~ normal(0, 1);
+      tau_ymodel ~ normal(0, 1);
+    } else {
+      // Park parameters with standard priors to avoid initialization issues
+      to_vector(alpha_ymodel_raw) ~ normal(0, 1);
+      tau_ymodel ~ normal(0, 1);
     }
 
     if (run_estimation==1) {
@@ -205,22 +224,22 @@ model {
       real log_l[length];
       if (Z[n] == 0 && D[n] == 0) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M00[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M00[l]]'));
+            log_l[l] = log_prob[S[M00[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M00[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M00[l]] * tau_ymodel[M00[l]] : 0.0)));
           }
       }
       else if (Z[n] == 1 && D[n] == 0) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M10[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M10[l]]'));
+            log_l[l] = log_prob[S[M10[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M10[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M10[l]] * tau_ymodel[M10[l]] : 0.0)));
           }
       }
       else if (Z[n] == 1 && D[n] == 1) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M11[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M11[l]]'));
+            log_l[l] = log_prob[S[M11[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M11[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M11[l]] * tau_ymodel[M11[l]] : 0.0)));
           }
       }
       else if (Z[n] == 0 && D[n] == 1) {
           for (l in 1:length) {
-            log_l[l] = log_prob[S[M01[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M01[l]]'));
+            log_l[l] = log_prob[S[M01[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M01[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M01[l]] * tau_ymodel[M01[l]] : 0.0)));
           }
       }
       target += log_sum_exp(log_l) - log_sum_exp(log_prob);
@@ -251,7 +270,7 @@ generated quantities {
 
         for (n in 1:N)
             for (k in 1:K_ymodel)
-                expected_mean[n, k] = inv_logit(X_ymodel[n] * beta_ymodel[k]');
+                expected_mean[n, k] = inv_logit(X_ymodel[n] * beta_ymodel[k]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], k] * tau_ymodel[k] : 0.0));
 
 	      // aggregate individual level predictions for the average probability and outcomes
         for (k in 1:(K_smodel+1)) {
