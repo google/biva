@@ -11,6 +11,7 @@ CleanData(
   z,
   x_ymodel = NULL,
   x_smodel = NULL,
+  group = NULL,
   ER = ER,
   side = side
 )
@@ -27,6 +28,8 @@ CleanData(
 \item{x_ymodel}{Names of the covariates to include in the Y-model (character vector, optional).}
 
 \item{x_smodel}{Names of the covariates to include in the S-model (character vector, optional).}
+
+\item{group}{Name of the grouping variable for hierarchical modeling (character, optional).}
 
 \item{ER}{The assumption of exclusion restriction (numeric; 1 if assumed, 0 otherwise).}
 

@@ -50,6 +50,7 @@ CleanData <- function(data,
                       z,
                       x_ymodel = NULL,
                       x_smodel = NULL,
+                      group = NULL,
                       ER = ER,
                       side = side) {
   stopifnot(is.data.frame(data))
