@@ -22,11 +22,11 @@ data {
     // The number of covariates in the S-models
     int<lower=0> P_smodel;
     // The treatment assigned vector (binary instrument variable)
-    int<lower=0, upper=1> Z[N];
+    array[N] int<lower=0, upper=1> Z;
     // The treatment received vector (binary treatment variable)
-    int<lower=0, upper=1> D[N];
+    array[N] int<lower=0, upper=1> D;
     // The dependent variable vector (continuous outcome variable)
-    real Y[N];
+    array[N] real Y;
     // The covariate matrix in the Y-models (including intercept after data cleaning)
     matrix[N, P_ymodel] X_ymodel;
     // The covariate matrix in the S-models (including intercept after data cleaning)
@@ -46,9 +46,9 @@ data {
     // The prior standard deviations for coefficients in the S-models (including intercept)
     matrix[K_smodel, P_smodel] beta_sd_smodel;
     // The prior shape for standard deviation of errors in the Y-models
-    real sigma_shape_ymodel[K_ymodel];
+    array[K_ymodel] real sigma_shape_ymodel;
     // The prior scale for standard deviation of errors in the Y-models
-    real<lower=0> sigma_scale_ymodel[K_ymodel];
+    array[K_ymodel] real<lower=0> sigma_scale_ymodel;
     // Flag for running estimation (0: no, 1: yes)
     int<lower=0, upper=1> run_estimation;
 	// Flag for using hierarchical modeling (0: no, 1: yes)
@@ -56,18 +56,18 @@ data {
     // The number of groups for hierarchical modeling
     int<lower=1> J;
     // The group index for each observation
-    int<lower=1, upper=J> group_idx[N];
+    array[N] int<lower=1, upper=J> group_idx;
 }
 
 transformed data {
     // S[k] indexes Y-model [k] and maps from it to the strata s (s = 1 if complier, 2 if nt, 3 if at)
-    int S[K_ymodel];
+    array[K_ymodel] int S;
     // Mzd maps units with Z=z and D=d to a vector of eligible Y-models indicated by nonzero elements
     // Mzd[i] = 0 means no eligible Y-model at the ith element
-    int<lower=0, upper=K_ymodel> M00[2];
-    int<lower=0, upper=K_ymodel> M01[2];
-    int<lower=0, upper=K_ymodel> M10[2];
-    int<lower=0, upper=K_ymodel> M11[2];
+    array[2] int<lower=0, upper=K_ymodel> M00;
+    array[2] int<lower=0, upper=K_ymodel> M01;
+    array[2] int<lower=0, upper=K_ymodel> M10;
+    array[2] int<lower=0, upper=K_ymodel> M11;
     // lengthzd is the number of eligible Y-models with Z=z and D=d
     int length00;
     int length01;
@@ -174,7 +174,7 @@ parameters {
     // coefficients in the S-models (including intercept)
     matrix[K_smodel, P_smodel] beta_smodel;
     // standard deviations of error in the Y-models
-    real<lower=0> sigma[K_ymodel];
+    array[K_ymodel] real<lower=0> sigma;
 	// random effects in the Y-models (group-level deviations)
     matrix[J, K_ymodel] alpha_ymodel_raw;
     // standard deviation of the random effects
@@ -210,7 +210,7 @@ model {
       // model
       for (n in 1:N) {
         int length;
-          real log_prob[K_smodel+1];
+          array[K_smodel+1] real log_prob;
           log_prob[1] = 0;
           for (k in 2:(K_smodel+1)) {
               log_prob[k] = X_smodel[n] * beta_smodel[k-1]';
@@ -230,7 +230,7 @@ model {
           }
 
           {
-      real log_l[length];
+      array[length] real log_l;
       if (Z[n] == 0 && D[n] == 0) {
           for (l in 1:length) {
             log_l[l] = log_prob[S[M00[l]]] + normal_lpdf(Y[n] | X_ymodel[n] * beta_ymodel[M00[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M00[l]] * tau_ymodel[M00[l]] : 0.0), sigma[M00[l]]);
