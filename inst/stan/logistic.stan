@@ -22,11 +22,11 @@ data {
     // The number of covariates in the S-models
     int<lower=0> P_smodel;
     // The treatment assigned vector (binary instrument variable)
-    int<lower=0, upper=1> Z[N];
+    array[N] int<lower=0, upper=1> Z;
     // The treatment received vector (binary treatment variable)
-    int<lower=0, upper=1> D[N];
+    array[N] int<lower=0, upper=1> D;
     // The dependent variable vector (binary outcome variable)
-    int<lower=0, upper=1> Y[N];
+    array[N] int<lower=0, upper=1> Y;
     // The covariate matrix in the Y-models (including intercept after data cleaning)
     matrix[N, P_ymodel] X_ymodel;
     // The covariate matrix in the S-models (including intercept after data cleaning)
@@ -52,18 +52,18 @@ data {
     // The number of groups for hierarchical modeling
     int<lower=1> J;
     // The group index for each observation
-    int<lower=1, upper=J> group_idx[N];
+    array[N] int<lower=1, upper=J> group_idx;
 }
 
 transformed data {
     // S[k] indexes Y-model [k] and maps from it to the strata s (s = 1 if complier, 2 if nt, 3 if at)
-    int S[K_ymodel];
+    array[K_ymodel] int S;
     // Mzd maps units with Z=z and D=d to a vector of eligible Y-models indicated by nonzero elements
     // Mzd[i] = 0 means no eligible Y-model at the ith element
-    int<lower=0, upper=K_ymodel> M00[2];
-    int<lower=0, upper=K_ymodel> M01[2];
-    int<lower=0, upper=K_ymodel> M10[2];
-    int<lower=0, upper=K_ymodel> M11[2];
+    array[2] int<lower=0, upper=K_ymodel> M00;
+    array[2] int<lower=0, upper=K_ymodel> M01;
+    array[2] int<lower=0, upper=K_ymodel> M10;
+    array[2] int<lower=0, upper=K_ymodel> M11;
     // lengthzd is the number of eligible Y-models with Z=z and D=d
     int length00;
     int length01;
@@ -201,7 +201,7 @@ model {
       // model
       for (n in 1:N) {
         int length;
-          real log_prob[K_smodel+1];
+          array[K_smodel+1] real log_prob;
           log_prob[1] = 0;
           for (k in 2:(K_smodel+1)) {
               log_prob[k] = X_smodel[n] * beta_smodel[k-1]';
@@ -221,7 +221,7 @@ model {
           }
 
           {
-      real log_l[length];
+      array[length] real log_l;
       if (Z[n] == 0 && D[n] == 0) {
           for (l in 1:length) {
             log_l[l] = log_prob[S[M00[l]]] + bernoulli_lpmf(Y[n] | inv_logit(X_ymodel[n] * beta_ymodel[M00[l]]' + (use_hierarchical == 1 ? alpha_ymodel_raw[group_idx[n], M00[l]] * tau_ymodel[M00[l]] : 0.0)));
